@@ -60,6 +60,17 @@ void scanInterlaced(SDL_Surface* surface, SDL_Surface* capture, Uint32 scanline)
 	}
 }
 
+void scanMiddleOut(SDL_Surface* surface, SDL_Surface* capture, Uint32 scanline)
+{
+	for (int i = 0; i < WIN_WIDTH; i++)
+	{
+		// copy pixel to the capture surface												If you can read it, that means it's not complex enough
+		*(Uint32*)((Uint8*)capture->pixels + capture->pitch * (WIN_HEIGHT/2 + (scanline/2 * ((scanline%2) ? (1) : (-1)))) + 4 * i) = *(Uint32*)((Uint8*)surface->pixels + surface->pitch * (WIN_HEIGHT/2 + (scanline/2 * ((scanline%2) ? (1) : (-1)))) + 4 * i);
+		// colour it green for cool visuals
+		*(Uint32*)((Uint8*)surface->pixels + capture->pitch * (WIN_HEIGHT/2 + (scanline/2 * ((scanline%2) ? (1) : (-1)))) + 4 * i) = SDL_MapRGB(surface->format, 0, 255, 0);
+	}
+}
+
 int main()
 {
 	SDL_Surface* capSurface = NULL;
@@ -121,7 +132,8 @@ int main()
 		drawPropeller(winSurface, angle, userArmCount);
 
 		// scanHorizontal(winSurface, capSurface, scanline);
-		scanInterlaced(winSurface, capSurface, scanline);
+		// scanInterlaced(winSurface, capSurface, scanline);
+		scanMiddleOut(winSurface, capSurface, scanline);
 
 		SDL_UpdateWindowSurface( window );
 		SDL_UpdateWindowSurface(capWindow);
