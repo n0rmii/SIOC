@@ -85,10 +85,11 @@ int main()
 	int quit = 0;
 	double userSpeed = 1;
 	int userArmCount = 1;
+	char userAlgo = 'h';
 
 	printf("Speed: ");
 	scanf("%lf", &userSpeed);
-	printf("Speed: %lf\nArm count: ", userSpeed);
+	printf("Arm count: ");
 	scanf("%d", &userArmCount);
 
 	if ( SDL_Init( SDL_INIT_EVERYTHING ) < 0 ) {
@@ -131,9 +132,21 @@ int main()
 		SDL_FillRect( winSurface, NULL, SDL_MapRGB( winSurface->format, 0, 0, 0 ) );
 		drawPropeller(winSurface, angle, userArmCount);
 
-		// scanHorizontal(winSurface, capSurface, scanline);
-		// scanInterlaced(winSurface, capSurface, scanline);
-		scanMiddleOut(winSurface, capSurface, scanline);
+		switch (userAlgo)
+		{
+		default:
+		case 'h':
+			scanHorizontal(winSurface, capSurface, scanline);
+			break;
+		
+		case 'i':
+			scanInterlaced(winSurface, capSurface, scanline);
+			break;
+		
+		case 'm':
+			scanMiddleOut(winSurface, capSurface, scanline);
+			break;
+		}
 
 		SDL_UpdateWindowSurface( window );
 		SDL_UpdateWindowSurface(capWindow);
