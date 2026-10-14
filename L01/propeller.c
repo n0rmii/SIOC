@@ -2,7 +2,7 @@
 #include <math.h>
 #include <SDL2/SDL.h>
 
-#define WIN_WIDTH 640
+#define WIN_WIDTH 480
 #define WIN_HEIGHT 480
 #define SCREEN_FPS 60
 #define PROP_RADIUS 200
@@ -42,10 +42,22 @@ void scanHorizontal(SDL_Surface* surface, SDL_Surface* capture, Uint32 scanline)
 {
 	for (int i = 0; i < WIN_WIDTH; i++)
 	{
+		// copy pixel to the capture surface
 		*(Uint32*)((Uint8*)capture->pixels + capture->pitch * scanline + 4 * i) = *(Uint32*)((Uint8*)surface->pixels + surface->pitch * scanline + 4 * i);
+		// colour it green for cool visuals
 		*(Uint32*)((Uint8*)surface->pixels + capture->pitch * scanline + 4 * i) = SDL_MapRGB(surface->format, 0, 255, 0);
 	}
-	
+}
+
+void scanInterlaced(SDL_Surface* surface, SDL_Surface* capture, Uint32 scanline)
+{
+	for (int i = 0; i < WIN_WIDTH; i++)
+	{
+		// copy pixel to the capture surface								This is C so we mathin with truth values like that
+		*(Uint32*)((Uint8*)capture->pixels + capture->pitch * ((scanline*2)%WIN_HEIGHT + (scanline > WIN_HEIGHT/2)) + 4 * i) = *(Uint32*)((Uint8*)surface->pixels + surface->pitch * ((scanline*2)%WIN_HEIGHT + (scanline > WIN_HEIGHT/2)) + 4 * i);
+		// colour it green for cool visuals
+		*(Uint32*)((Uint8*)surface->pixels + capture->pitch * ((scanline*2)%WIN_HEIGHT + (scanline > WIN_HEIGHT/2)) + 4 * i) = SDL_MapRGB(surface->format, 0, 255, 0);
+	}
 }
 
 int main()
@@ -107,7 +119,10 @@ int main()
 	{
 		SDL_FillRect( winSurface, NULL, SDL_MapRGB( winSurface->format, 0, 0, 0 ) );
 		drawPropeller(winSurface, angle, userArmCount);
-		scanHorizontal(winSurface, capSurface, scanline);
+
+		// scanHorizontal(winSurface, capSurface, scanline);
+		scanInterlaced(winSurface, capSurface, scanline);
+
 		SDL_UpdateWindowSurface( window );
 		SDL_UpdateWindowSurface(capWindow);
 		scanline++;
