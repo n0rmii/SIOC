@@ -87,6 +87,8 @@ int main()
 	int userArmCount = 1;
 	char userAlgo = 'h';
 
+	printf("Algorithm: ");
+	scanf("%c", &userAlgo);
 	printf("Speed: ");
 	scanf("%lf", &userSpeed);
 	printf("Arm count: ");
@@ -168,7 +170,7 @@ int main()
 		
 	} while (/*event.type != SDL_QUIT && scanline < WIN_HEIGHT*/ !quit && scanline < WIN_HEIGHT);
 	
-	if (SDL_SaveBMP(capSurface, "Capture.bmp") != 0 || SDL_SaveBMP(winSurface, "Propeller.bmp") != 0)
+	if (SDL_SaveBMP(capSurface, "Pictures/Capture.bmp") != 0 || SDL_SaveBMP(winSurface, "Pictures/Propeller.bmp") != 0)
 	{
 		printf("Error saving bitmap: %s\n", SDL_GetError());
 	}
