@@ -6,7 +6,7 @@
 #define WIN_HEIGHT 480
 #define SCREEN_FPS 60
 
-double varphiWindow(double x)
+double kernelWindow(double x)
 {
 	if (fabs(x) > 0.5)
 	{
@@ -18,7 +18,7 @@ double varphiWindow(double x)
 	}
 }
 
-double varphiTent(double x)
+double kernelTent(double x)
 {
 	x = fabs(x);
 	if (x > 1.0)
@@ -31,18 +31,14 @@ double varphiTent(double x)
 	}
 }
 
-double varphiKeys(double x)
+double kernelKeys(double x)
 {
 	x = fabs(x);
 	if (x == 0.0)
 	{
 		return 1;
 	}
-	else if (x == 2.0 || x == 1.0)
-	{
-		return 0;
-	}
-	else if (x >= 2.0)
+	else if (x >= 2.0 || x == 1.0)
 	{
 		return 0;
 	}
