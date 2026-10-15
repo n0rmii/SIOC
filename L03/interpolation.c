@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <math.h>
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
 
 #define WIN_WIDTH 640
 #define WIN_HEIGHT 480
 #define SCREEN_FPS 60
+#define SCREEN_MARGIN 3
 
 double kernelWindow(double x)
 {
@@ -64,11 +66,18 @@ int main()
 	SDL_Surface* surTransformed = NULL;
 	SDL_Window* winTransformed = NULL;
 
+	SDL_Surface* surImage = NULL;
+
 	SDL_Event event;
 
 	Uint32 msPerFrame = 1000 / SCREEN_FPS;
 
 	int quit = 0;
+	const char* userFilename[100] = {0};
+	double userScale = 1.0;
+
+	printf("Enter the image's filename: ");
+	scanf("%99s", userFilename);
 
 	if ( SDL_Init( SDL_INIT_EVERYTHING ) < 0 ) {
 		printf("Error initializing SDL: %s\n", SDL_GetError());
@@ -77,8 +86,15 @@ int main()
 		return 1;
 	}
 
-	winOriginal = SDL_CreateWindow( "Original", 100, 100, WIN_WIDTH, WIN_HEIGHT, SDL_WINDOW_SHOWN );
-	winTransformed = SDL_CreateWindow( "Transformed", 800, 100, WIN_WIDTH, WIN_HEIGHT, SDL_WINDOW_SHOWN );
+	surImage = IMG_Load(userFilename);
+	if (!surImage)
+	{
+		printf("Error loading image: %s\n", SDL_GetError());
+		return 1;
+	}
+
+	winOriginal = SDL_CreateWindow( "Original", 100, 100, surImage->w + 2*SCREEN_MARGIN, surImage->h + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
+	winTransformed = SDL_CreateWindow( "Transformed", 800, 100, surImage->w * userScale + 1, surImage->h * userScale + 1, SDL_WINDOW_SHOWN );
 	// Make sure creating the winOriginal succeeded
 	if ( !winOriginal || !winTransformed) {
 		printf("Error creating window: %s\n", SDL_GetError());
@@ -99,21 +115,47 @@ int main()
 		return 1;
 	}
 
-	SDL_FillRect( surOriginal, NULL, SDL_MapRGB( surOriginal->format, 0, 0, 0 ) );
-	SDL_UpdateWindowSurface(winOriginal);
-	
-	SDL_Delay(msPerFrame);
-	SDL_PollEvent(&event);
-		//Handle events on queue
-	while( SDL_PollEvent( &event ) != 0 )
-	{
-		//User requests quit
-		if( event.type == SDL_QUIT )
-		{
-			quit = 1;
-		}
-	}
+	SDL_BlitSurface(surImage, NULL, surOriginal, NULL);
+	SDL_FreeSurface(surImage);
 
+	SDL_FillRect( surTransformed, NULL, SDL_MapRGB( surTransformed->format, 0, 0, 0 ) );
+
+
+	
+	do // main loop
+	{
+		SDL_UpdateWindowSurface(winOriginal);
+		SDL_UpdateWindowSurface(winTransformed);
+		
+		SDL_Delay(msPerFrame);
+		SDL_PollEvent(&event);
+			//Handle events on queue
+		while( SDL_PollEvent( &event ) != 0 )
+		{
+			//User requests quit
+			if( event.type == SDL_QUIT )
+			{
+				quit = 1;
+			}
+		}
+	} while (!quit);
+	
+
+	// do // end loop to keep displaying the changes
+	// {
+	// 	SDL_UpdateWindowSurface(winOriginal);
+	// 	SDL_UpdateWindowSurface(winTransformed);
+	// 	SDL_Delay(msPerFrame);
+	// 	while( SDL_PollEvent( &event ) != 0 )
+	// 	{
+	// 		//User requests quit
+	// 		if( event.type == SDL_QUIT )
+	// 		{
+	// 			quit = 1;
+	// 		}
+	// 	}
+	// } while (!quit);
+	
 	SDL_DestroyWindow(winOriginal);
 	SDL_DestroyWindow(winTransformed);
 	SDL_Quit();
