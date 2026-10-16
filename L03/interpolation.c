@@ -6,11 +6,11 @@
 #define WIN_WIDTH 640
 #define WIN_HEIGHT 480
 #define SCREEN_FPS 60
-#define SCREEN_MARGIN 3
+#define SCREEN_MARGIN 0 // Hopefully won't be needed
 
 double kernelWindow(double x)
 {
-	if (fabs(x) > 0.5)
+	if (x >= 0.5 || x < -0.5)
 	{
 		return 0.0;
 	}
@@ -22,14 +22,14 @@ double kernelWindow(double x)
 
 double kernelTent(double x)
 {
-	x = fabs(x);
-	if (x > 1.0)
+	// x = fabs(x);
+	if (x >= 1.0 || x < -1.0)
 	{
 		return 0.0;
 	}
 	else
 	{
-		return 1.0 - x;
+		return 1.0 - fabs(x);
 	}
 }
 
@@ -63,6 +63,8 @@ int main()
 {
 	SDL_Surface* surOriginal = NULL;
 	SDL_Window* winOriginal = NULL;
+	SDL_Surface* surIntermediate = NULL;
+	SDL_Window* winIntermediate = NULL;
 	SDL_Surface* surTransformed = NULL;
 	SDL_Window* winTransformed = NULL;
 
@@ -73,11 +75,14 @@ int main()
 	Uint32 msPerFrame = 1000 / SCREEN_FPS;
 
 	int quit = 0;
-	const char* userFilename[100] = {0};
+	const char* originalFilename[100] = {0};
+	const char* transformedFilename[100] = {0};
 	double userScale = 1.0;
 
-	printf("Enter the image's filename: ");
-	scanf("%99s", userFilename);
+	printf("Enter the original image's filename: ");
+	scanf("%99s", originalFilename);
+	printf("Enter the transformed image's filename: ");
+	scanf("%99s", transformedFilename);
 
 	if ( SDL_Init( SDL_INIT_EVERYTHING ) < 0 ) {
 		printf("Error initializing SDL: %s\n", SDL_GetError());
@@ -86,17 +91,23 @@ int main()
 		return 1;
 	}
 
-	surImage = IMG_Load(userFilename);
+	surImage = IMG_Load(originalFilename);
 	if (!surImage)
 	{
 		printf("Error loading image: %s\n", SDL_GetError());
 		return 1;
 	}
 
-	winOriginal = SDL_CreateWindow( "Original", 100, 100, surImage->w + 2*SCREEN_MARGIN, surImage->h + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
-	winTransformed = SDL_CreateWindow( "Transformed", 800, 100, surImage->w * userScale + 1, surImage->h * userScale + 1, SDL_WINDOW_SHOWN );
+	int originalW = surImage->w;
+	int originalH = surImage->h;
+	int transformedW = originalW * userScale;
+	int transformedH = originalH * userScale;
+
+	winOriginal = SDL_CreateWindow( "Original", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, originalW + 2*SCREEN_MARGIN, originalH + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
+	winIntermediate = SDL_CreateWindow( "Intermediate", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, transformedW + 2*SCREEN_MARGIN, originalH + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
+	winTransformed = SDL_CreateWindow( "Transformed", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, transformedW + 2*SCREEN_MARGIN, transformedH + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
 	// Make sure creating the winOriginal succeeded
-	if ( !winOriginal || !winTransformed) {
+	if ( !winOriginal || !winIntermediate || !winTransformed) {
 		printf("Error creating window: %s\n", SDL_GetError());
 		// system("wait");
 		// End the program
@@ -106,25 +117,39 @@ int main()
 	// Get the surface from the winOriginal
 	surOriginal = SDL_GetWindowSurface( winOriginal );
 	surTransformed = SDL_GetWindowSurface( winTransformed );
+	surTransformed = SDL_GetWindowSurface( winTransformed );
 
 	// Make sure getting the surface succeeded
-	if ( !surOriginal || !surTransformed) {
+	if ( !surOriginal || !surTransformed || !surTransformed) {
 		printf("Error getting surface: %s\n", SDL_GetError());
 		// system("wait");
 		// End the program
 		return 1;
 	}
 
-	SDL_BlitSurface(surImage, NULL, surOriginal, NULL);
+
+	SDL_Rect newImgPos;
+	newImgPos.x = SCREEN_MARGIN;
+	newImgPos.y = SCREEN_MARGIN; // width and height should be ignored according to wiki, so im only setting offset
+	SDL_BlitSurface(surImage, NULL, surOriginal, &newImgPos);
 	SDL_FreeSurface(surImage);
 
+	SDL_FillRect( surIntermediate, NULL, SDL_MapRGB( surTransformed->format, 0, 0, 0 ) );
 	SDL_FillRect( surTransformed, NULL, SDL_MapRGB( surTransformed->format, 0, 0, 0 ) );
 
-
+	for (int j = 0; j < originalH; j++)
+	{
+		for (int i = 0; i < transformedW; i++)
+		{
+			
+		}
+	}
+	
 	
 	do // main loop
 	{
 		SDL_UpdateWindowSurface(winOriginal);
+		SDL_UpdateWindowSurface(winIntermediate);
 		SDL_UpdateWindowSurface(winTransformed);
 		
 		SDL_Delay(msPerFrame);
