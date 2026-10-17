@@ -100,8 +100,8 @@ int main()
 
 	int originalW = surImage->w;
 	int originalH = surImage->h;
-	int transformedW = originalW * userScale;
-	int transformedH = originalH * userScale;
+	int transformedW = round(originalW * userScale);
+	int transformedH = round(originalH * userScale);
 
 	winOriginal = SDL_CreateWindow( "Original", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, originalW + 2*SCREEN_MARGIN, originalH + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
 	winIntermediate = SDL_CreateWindow( "Intermediate", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, transformedW + 2*SCREEN_MARGIN, originalH + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
@@ -137,11 +137,17 @@ int main()
 	SDL_FillRect( surIntermediate, NULL, SDL_MapRGB( surTransformed->format, 0, 0, 0 ) );
 	SDL_FillRect( surTransformed, NULL, SDL_MapRGB( surTransformed->format, 0, 0, 0 ) );
 
+
+	Uint32* targetPixel;
 	for (int j = 0; j < originalH; j++)
 	{
 		for (int i = 0; i < transformedW; i++)
 		{
-			
+			*targetPixel = 0;
+			for (int k = 0; k < originalH; k++)
+			{
+				// incomprehensible pointer arithmetic here we goooo
+			}
 		}
 	}
 	
