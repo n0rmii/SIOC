@@ -59,14 +59,99 @@ double kernelKeys(double x)
 	}
 }
 
+int scaleImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double scale, double (*kernel)(double))
+{
+	SDL_Surface* surIntermediate = NULL;
+	SDL_Window* winIntermediate = NULL;
+	int originalW = surOriginal->w;
+	int originalH = surOriginal->h;
+	int transformedW = round(originalW * scale)-1;
+	int transformedH = round(originalH * scale)-1;
+	
+	// Creating a surface without a window is a pain so we're making a temporary one
+	winIntermediate = SDL_CreateWindow( "Intermediate", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, transformedW + 2*SCREEN_MARGIN, originalH + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
+	if (!winIntermediate) {
+		printf("Error creating window: %s\n", SDL_GetError());
+		return 1;
+	}
+	surIntermediate = SDL_GetWindowSurface(winIntermediate);
+	if (!surIntermediate) {
+		printf("Error getting surface: %s\n", SDL_GetError());
+		return 1;
+	}
+	SDL_FillRect( surIntermediate, NULL, SDL_MapRGB(surIntermediate->format, 0, 0, 0 ));
+	SDL_FillRect( surTransformed, NULL, SDL_MapRGB(surTransformed->format, 0, 0, 0 ));
+
+	Uint32* targetPixel;
+	Uint8 targetPixelR, targetPixelG, targetPixelB, originalPixelR, originalPixelG, originalPixelB;
+
+	//stretching horizontally
+	for (int j = 0; j < originalH; j++)
+	{
+		for (int i = 0; i < transformedW; i++)
+		{
+			targetPixel = (Uint32*)((Uint8*)(surIntermediate->pixels) + surIntermediate->pitch * j + surIntermediate->format->BytesPerPixel * i);
+			// *targetPixel = 0;
+			targetPixelR = 0;
+			targetPixelG = 0;
+			targetPixelB = 0;
+			for (int k = 0; k < originalW; k++)
+			{
+				//technically i should precalucalte this otside the 'i' for-loop and store it in a nother array but eehhhhhh...
+				SDL_GetRGB(*(Uint32*)((Uint8*)(surOriginal->pixels) + surOriginal->pitch * j + surOriginal->format->BytesPerPixel * k), surOriginal->format, &originalPixelR, &originalPixelG, &originalPixelB);
+				targetPixelR += originalPixelR * (*kernel)((double)k - (double)i/scale);
+				targetPixelG += originalPixelG * (*kernel)((double)k - (double)i/scale);
+				targetPixelB += originalPixelB * (*kernel)((double)k - (double)i/scale);
+			}
+			*targetPixel = SDL_MapRGB(surIntermediate->format, targetPixelR, targetPixelG, targetPixelB);
+		}
+		if (j%50 == 0)
+		{
+			SDL_UpdateWindowSurface(winIntermediate);
+		}
+	}
+
+	//stretching vertically
+	//i'm doing it separately because i'm not sure it would work if i did horizontal and vertical simultaneously
+	for (int i = 0; i < transformedW; i++)
+	{
+		for (int j = 0; j < transformedH; j++)
+		{
+			targetPixel = (Uint32*)((Uint8*)(surTransformed->pixels) + surTransformed->pitch * j + surTransformed->format->BytesPerPixel * i);
+			// *targetPixel = 0;
+			targetPixelR = 0;
+			targetPixelG = 0;
+			targetPixelB = 0;
+			for (int k = 0; k < originalH; k++)
+			{
+				SDL_GetRGB(*(Uint32*)((Uint8*)(surIntermediate->pixels) + surIntermediate->pitch * k + surIntermediate->format->BytesPerPixel * i), surIntermediate->format, &originalPixelR, &originalPixelG, &originalPixelB);
+				targetPixelR += originalPixelR * (*kernel)((double)k - (double)j/scale);
+				targetPixelG += originalPixelG * (*kernel)((double)k - (double)j/scale);
+				targetPixelB += originalPixelB * (*kernel)((double)k - (double)j/scale);
+			}
+			*targetPixel = SDL_MapRGB(surTransformed->format, targetPixelR, targetPixelG, targetPixelB);
+		}
+		if (i%50 == 0)
+		{
+			SDL_UpdateWindowSurface(winIntermediate);
+		}
+	}
+
+	SDL_UpdateWindowSurface(winIntermediate);
+	SDL_DestroyWindow(winIntermediate);
+	return 0;
+}
+
 int main()
 {
 	SDL_Surface* surOriginal = NULL;
 	SDL_Window* winOriginal = NULL;
-	SDL_Surface* surIntermediate = NULL;
-	SDL_Window* winIntermediate = NULL;
-	SDL_Surface* surTransformed = NULL;
-	SDL_Window* winTransformed = NULL;
+	SDL_Surface* surWindow = NULL;
+	SDL_Window* winWindow = NULL;
+	SDL_Surface* surTent = NULL;
+	SDL_Window* winTent = NULL;
+	SDL_Surface* surKeys = NULL;
+	SDL_Window* winKeys = NULL;
 
 	SDL_Surface* surImage = NULL;
 
@@ -102,30 +187,30 @@ int main()
 
 	int originalW = surImage->w;
 	int originalH = surImage->h;
-	int transformedW = round(originalW * userScale);
-	int transformedH = round(originalH * userScale);
+	int transformedW = round(originalW * userScale)-1;
+	int transformedH = round(originalH * userScale)-1;
+	// int transformedW = originalW * userScale;
+	// int transformedH = originalH * userScale;
 
 	winOriginal = SDL_CreateWindow( "Original", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, originalW + 2*SCREEN_MARGIN, originalH + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
-	winIntermediate = SDL_CreateWindow( "Intermediate", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, transformedW + 2*SCREEN_MARGIN, originalH + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
-	winTransformed = SDL_CreateWindow( "Transformed", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, transformedW + 2*SCREEN_MARGIN, transformedH + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
+	winWindow = SDL_CreateWindow( "Window", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, transformedW + 2*SCREEN_MARGIN, transformedH + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
+	winTent = SDL_CreateWindow( "Tent", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, transformedW + 2*SCREEN_MARGIN, transformedH + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
+	winKeys = SDL_CreateWindow( "Keys", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, transformedW + 2*SCREEN_MARGIN, transformedH + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
 	// Make sure creating the winOriginal succeeded
-	if ( !winOriginal || !winIntermediate || !winTransformed) {
+	if (!winOriginal || !winWindow || !winTent || !winKeys) {
 		printf("Error creating window: %s\n", SDL_GetError());
-		// system("wait");
-		// End the program
 		return 1;
 	}
 
 	// Get the surface from the winOriginal
-	surOriginal = SDL_GetWindowSurface( winOriginal );
-	surIntermediate = SDL_GetWindowSurface( winIntermediate );
-	surTransformed = SDL_GetWindowSurface( winTransformed );
+	surOriginal = SDL_GetWindowSurface(winOriginal);
+	surWindow = SDL_GetWindowSurface(winWindow);
+	surTent = SDL_GetWindowSurface(winTent);
+	surKeys = SDL_GetWindowSurface(winKeys);
 
 	// Make sure getting the surface succeeded
-	if ( !surOriginal || !surIntermediate || !surTransformed) {
+	if (!surOriginal || !surWindow || !surTent || !surKeys) {
 		printf("Error getting surface: %s\n", SDL_GetError());
-		// system("wait");
-		// End the program
 		return 1;
 	}
 
@@ -136,62 +221,30 @@ int main()
 	SDL_BlitSurface(surImage, NULL, surOriginal, &newImgPos);
 	SDL_FreeSurface(surImage);
 
-	SDL_FillRect( surIntermediate, NULL, SDL_MapRGB( surIntermediate->format, 0, 0, 0 ) );
-	SDL_FillRect( surTransformed, NULL, SDL_MapRGB( surTransformed->format, 0, 0, 0 ) );
-
-	Uint32* targetPixel;
-	Uint8 targetPixelR, targetPixelG, targetPixelB, originalPixelR, originalPixelG, originalPixelB;
-
-	//stretching horizontally
-	for (int j = 0; j < originalH; j++)
+	if (scaleImage(surOriginal, surWindow, userScale, &kernelWindow))
 	{
-		for (int i = 0; i < transformedW; i++)
-		{
-			targetPixel = (Uint32*)((Uint8*)(surIntermediate->pixels) + surIntermediate->pitch * j + surIntermediate->format->BytesPerPixel * i);
-			// *targetPixel = 0;
-			targetPixelR = 0;
-			targetPixelG = 0;
-			targetPixelB = 0;
-			for (int k = 0; k < originalW; k++)
-			{
-				//technically i should precalucalte this otside the 'i' for-loop and store it in a nother array but eehhhhhh...
-				SDL_GetRGB(*(Uint32*)((Uint8*)(surOriginal->pixels) + surOriginal->pitch * j + surOriginal->format->BytesPerPixel * k), surOriginal->format, &originalPixelR, &originalPixelG, &originalPixelB);
-				targetPixelR += originalPixelR * kernelKeys((double)k - (double)i/userScale);
-				targetPixelG += originalPixelG * kernelKeys((double)k - (double)i/userScale);
-				targetPixelB += originalPixelB * kernelKeys((double)k - (double)i/userScale);
-			}
-			*targetPixel = SDL_MapRGB(surIntermediate->format, targetPixelR, targetPixelG, targetPixelB);
-		}
+		printf("Error in window\n");
+		return 1;
 	}
-
-	//stretching vertically
-	//i'm doing it separately because i'm not sure it would work if i did horizontal and vertical simultaneously
-	for (int i = 0; i < transformedW; i++)
+	if (scaleImage(surOriginal, surTent, userScale, &kernelTent))
 	{
-		for (int j = 0; j < transformedH; j++)
-		{
-			targetPixel = (Uint32*)((Uint8*)(surTransformed->pixels) + surTransformed->pitch * j + surTransformed->format->BytesPerPixel * i);
-			// *targetPixel = 0;
-			targetPixelR = 0;
-			targetPixelG = 0;
-			targetPixelB = 0;
-			for (int k = 0; k < originalH; k++)
-			{
-				SDL_GetRGB(*(Uint32*)((Uint8*)(surIntermediate->pixels) + surIntermediate->pitch * k + surIntermediate->format->BytesPerPixel * i), surIntermediate->format, &originalPixelR, &originalPixelG, &originalPixelB);
-				targetPixelR += originalPixelR * kernelKeys((double)k - (double)j/userScale);
-				targetPixelG += originalPixelG * kernelKeys((double)k - (double)j/userScale);
-				targetPixelB += originalPixelB * kernelKeys((double)k - (double)j/userScale);
-			}
-			*targetPixel = SDL_MapRGB(surTransformed->format, targetPixelR, targetPixelG, targetPixelB);
-		}
+		printf("Error in tent\n");
+		return 1;
+	}
+	if (scaleImage(surOriginal, surKeys, userScale, &kernelKeys))
+	{
+		printf("Error in keys\n");
+		return 1;
 	}
 	
 
 	do // main loop
 	{
 		SDL_UpdateWindowSurface(winOriginal);
-		SDL_UpdateWindowSurface(winIntermediate);
-		SDL_UpdateWindowSurface(winTransformed);
+		// SDL_UpdateWindowSurface(winIntermediate);
+		SDL_UpdateWindowSurface(winWindow);
+		SDL_UpdateWindowSurface(winTent);
+		SDL_UpdateWindowSurface(winKeys);
 		
 		SDL_Delay(msPerFrame);
 		SDL_PollEvent(&event);
@@ -199,7 +252,7 @@ int main()
 		while( SDL_PollEvent( &event ) != 0 )
 		{
 			//User requests quit
-			printf("Event: %d\n", event.type);
+			// printf("Event: %d\n", event.type);
 			if( event.type == SDL_QUIT )
 			{
 				quit = 1;
@@ -237,8 +290,9 @@ int main()
 	// } while (!quit);
 	
 	SDL_DestroyWindow(winOriginal);
-	SDL_DestroyWindow(winIntermediate);
-	SDL_DestroyWindow(winTransformed);
+	SDL_DestroyWindow(winWindow);
+	SDL_DestroyWindow(winTent);
+	SDL_DestroyWindow(winKeys);
 	SDL_Quit();
 
 	return 0;
