@@ -84,6 +84,7 @@ int scaleImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double sca
 
 	Uint32* targetPixel;
 	Uint8 targetPixelR, targetPixelG, targetPixelB, originalPixelR, originalPixelG, originalPixelB;
+	int clampPixelR, clampPixelG, clampPixelB;
 
 	//stretching horizontally
 	for (int j = 0; j < originalH; j++)
@@ -91,18 +92,34 @@ int scaleImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double sca
 		for (int i = 0; i < transformedW; i++)
 		{
 			targetPixel = (Uint32*)((Uint8*)(surIntermediate->pixels) + surIntermediate->pitch * j + surIntermediate->format->BytesPerPixel * i);
-			// *targetPixel = 0;
 			targetPixelR = 0;
 			targetPixelG = 0;
 			targetPixelB = 0;
+			clampPixelR = 0;
+			clampPixelG = 0;
+			clampPixelB = 0;
 			for (int k = 0; k < originalW; k++)
 			{
 				//technically i should precalucalte this otside the 'i' for-loop and store it in a nother array but eehhhhhh...
 				SDL_GetRGB(*(Uint32*)((Uint8*)(surOriginal->pixels) + surOriginal->pitch * j + surOriginal->format->BytesPerPixel * k), surOriginal->format, &originalPixelR, &originalPixelG, &originalPixelB);
-				targetPixelR += originalPixelR * (*kernel)((double)k - (double)i/scale);
-				targetPixelG += originalPixelG * (*kernel)((double)k - (double)i/scale);
-				targetPixelB += originalPixelB * (*kernel)((double)k - (double)i/scale);
+				// targetPixelR += originalPixelR * (*kernel)((double)k - (double)i/scale);
+				// targetPixelG += originalPixelG * (*kernel)((double)k - (double)i/scale);
+				// targetPixelB += originalPixelB * (*kernel)((double)k - (double)i/scale);
+				// clampPixelR = targetPixelR;
+				clampPixelR += originalPixelR * (*kernel)((double)k - (double)i/scale);
+				// clampPixelR = ((clampPixelR < 0) ? (0) : ((clampPixelR > 255) ? (255) : (clampPixelR)));
+				
+				// clampPixelG = targetPixelG;
+				clampPixelG += originalPixelG * (*kernel)((double)k - (double)i/scale);
+				// clampPixelG = ((clampPixelG < 0) ? (0) : ((clampPixelG > 255) ? (255) : (clampPixelG)));
+				
+				// clampPixelB = targetPixelB;
+				clampPixelB += originalPixelB * (*kernel)((double)k - (double)i/scale);
+				// clampPixelB = ((clampPixelB < 0) ? (0) : ((clampPixelB > 255) ? (255) : (clampPixelB)));
 			}
+			targetPixelR = (Uint8)((clampPixelR < 0) ? (0) : ((clampPixelR > 255) ? (255) : (clampPixelR)));
+			targetPixelG = (Uint8)((clampPixelG < 0) ? (0) : ((clampPixelG > 255) ? (255) : (clampPixelG)));
+			targetPixelB = (Uint8)((clampPixelB < 0) ? (0) : ((clampPixelB > 255) ? (255) : (clampPixelB)));
 			*targetPixel = SDL_MapRGB(surIntermediate->format, targetPixelR, targetPixelG, targetPixelB);
 		}
 		if (j%50 == 0)
@@ -118,18 +135,33 @@ int scaleImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double sca
 		for (int j = 0; j < transformedH; j++)
 		{
 			targetPixel = (Uint32*)((Uint8*)(surTransformed->pixels) + surTransformed->pitch * j + surTransformed->format->BytesPerPixel * i);
-			// *targetPixel = 0;
 			targetPixelR = 0;
 			targetPixelG = 0;
 			targetPixelB = 0;
+			clampPixelR = 0;
+			clampPixelG = 0;
+			clampPixelB = 0;
 			for (int k = 0; k < originalH; k++)
 			{
 				SDL_GetRGB(*(Uint32*)((Uint8*)(surIntermediate->pixels) + surIntermediate->pitch * k + surIntermediate->format->BytesPerPixel * i), surIntermediate->format, &originalPixelR, &originalPixelG, &originalPixelB);
-				targetPixelR += originalPixelR * (*kernel)((double)k - (double)j/scale);
-				targetPixelG += originalPixelG * (*kernel)((double)k - (double)j/scale);
-				targetPixelB += originalPixelB * (*kernel)((double)k - (double)j/scale);
+				// targetPixelR += originalPixelR * (*kernel)((double)k - (double)j/scale);
+				// targetPixelG += originalPixelG * (*kernel)((double)k - (double)j/scale);
+				// targetPixelB += originalPixelB * (*kernel)((double)k - (double)j/scale);
+				clampPixelR += originalPixelR * (*kernel)((double)k - (double)j/scale);
+				// clampPixelR = ((clampPixelR < 0) ? (0) : ((clampPixelR > 255) ? (255) : (clampPixelR)));
+				
+				// clampPixelG = targetPixelG;
+				clampPixelG += originalPixelG * (*kernel)((double)k - (double)j/scale);
+				// clampPixelG = ((clampPixelG < 0) ? (0) : ((clampPixelG > 255) ? (255) : (clampPixelG)));
+				
+				// clampPixelB = targetPixelB;
+				clampPixelB += originalPixelB * (*kernel)((double)k - (double)j/scale);
+				// clampPixelB = ((clampPixelB < 0) ? (0) : ((clampPixelB > 255) ? (255) : (clampPixelB)));
 			}
-			*targetPixel = SDL_MapRGB(surTransformed->format, targetPixelR, targetPixelG, targetPixelB);
+			targetPixelR = (Uint8)((clampPixelR < 0) ? (0) : ((clampPixelR > 255) ? (255) : (clampPixelR)));
+			targetPixelG = (Uint8)((clampPixelG < 0) ? (0) : ((clampPixelG > 255) ? (255) : (clampPixelG)));
+			targetPixelB = (Uint8)((clampPixelB < 0) ? (0) : ((clampPixelB > 255) ? (255) : (clampPixelB)));
+			*targetPixel = SDL_MapRGB(surIntermediate->format, targetPixelR, targetPixelG, targetPixelB);
 		}
 		if (i%50 == 0)
 		{
@@ -221,16 +253,16 @@ int main()
 	SDL_BlitSurface(surImage, NULL, surOriginal, &newImgPos);
 	SDL_FreeSurface(surImage);
 
-	if (scaleImage(surOriginal, surWindow, userScale, &kernelWindow))
-	{
-		printf("Error in window\n");
-		return 1;
-	}
-	if (scaleImage(surOriginal, surTent, userScale, &kernelTent))
-	{
-		printf("Error in tent\n");
-		return 1;
-	}
+	// if (scaleImage(surOriginal, surWindow, userScale, &kernelWindow))
+	// {
+	// 	printf("Error in window\n");
+	// 	return 1;
+	// }
+	// if (scaleImage(surOriginal, surTent, userScale, &kernelTent))
+	// {
+	// 	printf("Error in tent\n");
+	// 	return 1;
+	// }
 	if (scaleImage(surOriginal, surKeys, userScale, &kernelKeys))
 	{
 		printf("Error in keys\n");
