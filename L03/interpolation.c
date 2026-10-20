@@ -110,8 +110,6 @@ int scaleImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double sca
 					clampPixelR += originalPixelR * (*kernel)(n - (double)i/scale); // I'm smart enough to know the error is here...
 					clampPixelG += originalPixelG * (*kernel)(n - (double)i/scale); // ...but not smart enough to know how to fix it
 					clampPixelB += originalPixelB * (*kernel)(n - (double)i/scale);
-					
-					printf("something: %lf, %d, %d\n", round((double)(i)/scale), n, clampPixelR);
 				}
 				// SDL_Delay(30);
 			}
@@ -140,7 +138,7 @@ int scaleImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double sca
 			clampPixelR = 0;
 			clampPixelG = 0;
 			clampPixelB = 0;
-			for (int k = KERNEL_RADIUS; k <= KERNEL_RADIUS; k++)
+			for (int k = -KERNEL_RADIUS; k <= KERNEL_RADIUS; k++)
 			{
 				n = ((int)round((double)(j)/scale) + k);
 				if (n >= 0 && n < originalH)
@@ -149,6 +147,8 @@ int scaleImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double sca
 					clampPixelR += originalPixelR * (*kernel)(n - (double)j/scale);
 					clampPixelG += originalPixelG * (*kernel)(n - (double)j/scale);
 					clampPixelB += originalPixelB * (*kernel)(n - (double)j/scale);
+					
+					printf("something: %lf, %d, %d\n", round((double)(j)/scale), n, clampPixelR);
 				}
 			}
 			targetPixelR = (Uint8)((clampPixelR < 0) ? (0) : ((clampPixelR > 255) ? (255) : (clampPixelR)));
@@ -158,7 +158,7 @@ int scaleImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double sca
 		}
 		if (i%50 == 0)
 		{
-			SDL_UpdateWindowSurface(winIntermediate);
+			SDL_UpdateWindowSurface(winIntermediate); // I cant update winTransformed guhhhhh
 			// SDL_Delay(330);
 		}
 	}
