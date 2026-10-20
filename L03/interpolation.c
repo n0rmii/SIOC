@@ -85,7 +85,7 @@ int scaleImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double sca
 
 	Uint32* targetPixel;
 	Uint8 targetPixelR, targetPixelG, targetPixelB, originalPixelR, originalPixelG, originalPixelB;
-	int clampPixelR, clampPixelG, clampPixelB;
+	int clampPixelR, clampPixelG, clampPixelB, n;
 
 	//stretching horizontally
 	for (int j = 0; j < originalH; j++)
@@ -102,15 +102,16 @@ int scaleImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double sca
 			// Going through the pixels closest to target to go from O(n^3) (atrocious) to O(n^2) (bad)
 			for (int k = -KERNEL_RADIUS; k <= KERNEL_RADIUS; k++)
 			{
+				n = ((int)round((double)(i)/scale) + k);
 				//technically i should precalucalte this otside the 'i' for-loop and store it in another array but eehhhhhh...
-				if (((int)round((double)(i)/scale) + k) >= 0 && ((int)round((double)(i)/scale) + k) < originalW)
+				if (n >= 0 && n < originalW)
 				{
-					SDL_GetRGB(*(Uint32*)((Uint8*)(surOriginal->pixels) + surOriginal->pitch * j + surOriginal->format->BytesPerPixel * ((int)round((double)(i)/scale) + k)), surOriginal->format, &originalPixelR, &originalPixelG, &originalPixelB);
-					clampPixelR += originalPixelR * (*kernel)(((int)round((double)(i)/scale) + k) - (double)i/scale); // I'm smart enough to know the error is here...
-					clampPixelG += originalPixelG * (*kernel)(((int)round((double)(i)/scale) + k) - (double)i/scale); // ...but not smart enough to know how to fix it
-					clampPixelB += originalPixelB * (*kernel)(((int)round((double)(i)/scale) + k) - (double)i/scale);
+					SDL_GetRGB(*(Uint32*)((Uint8*)(surOriginal->pixels) + surOriginal->pitch * j + surOriginal->format->BytesPerPixel * n), surOriginal->format, &originalPixelR, &originalPixelG, &originalPixelB);
+					clampPixelR += originalPixelR * (*kernel)(n - (double)i/scale); // I'm smart enough to know the error is here...
+					clampPixelG += originalPixelG * (*kernel)(n - (double)i/scale); // ...but not smart enough to know how to fix it
+					clampPixelB += originalPixelB * (*kernel)(n - (double)i/scale);
 					
-					printf("something: %lf, %d, %d\n", round((double)(i)/scale), ((int)round((double)(i)/scale) + k), clampPixelR);
+					printf("something: %lf, %d, %d\n", round((double)(i)/scale), n, clampPixelR);
 				}
 				// SDL_Delay(30);
 			}
@@ -141,12 +142,13 @@ int scaleImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double sca
 			clampPixelB = 0;
 			for (int k = KERNEL_RADIUS; k <= KERNEL_RADIUS; k++)
 			{
-				if (((int)round((double)(j)/scale) + k) >= 0 && ((int)round((double)(j)/scale) + k) < originalH)
+				n = ((int)round((double)(j)/scale) + k);
+				if (n >= 0 && n < originalH)
 				{
-					SDL_GetRGB(*(Uint32*)((Uint8*)(surIntermediate->pixels) + surIntermediate->pitch * ((int)round((double)(j)/scale) + k) + surIntermediate->format->BytesPerPixel * i), surIntermediate->format, &originalPixelR, &originalPixelG, &originalPixelB);
-					clampPixelR += originalPixelR * (*kernel)(((int)round((double)(j)/scale) + k) - (double)j/scale);
-					clampPixelG += originalPixelG * (*kernel)(((int)round((double)(j)/scale) + k) - (double)j/scale);
-					clampPixelB += originalPixelB * (*kernel)(((int)round((double)(j)/scale) + k) - (double)j/scale);
+					SDL_GetRGB(*(Uint32*)((Uint8*)(surIntermediate->pixels) + surIntermediate->pitch * n + surIntermediate->format->BytesPerPixel * i), surIntermediate->format, &originalPixelR, &originalPixelG, &originalPixelB);
+					clampPixelR += originalPixelR * (*kernel)(n - (double)j/scale);
+					clampPixelG += originalPixelG * (*kernel)(n - (double)j/scale);
+					clampPixelB += originalPixelB * (*kernel)(n - (double)j/scale);
 				}
 			}
 			targetPixelR = (Uint8)((clampPixelR < 0) ? (0) : ((clampPixelR > 255) ? (255) : (clampPixelR)));
