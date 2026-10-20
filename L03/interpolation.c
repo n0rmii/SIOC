@@ -106,9 +106,9 @@ int scaleImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double sca
 				if (((int)round((double)(i)/scale) + k) >= 0 && ((int)round((double)(i)/scale) + k) < originalW)
 				{
 					SDL_GetRGB(*(Uint32*)((Uint8*)(surOriginal->pixels) + surOriginal->pitch * j + surOriginal->format->BytesPerPixel * ((int)round((double)(i)/scale) + k)), surOriginal->format, &originalPixelR, &originalPixelG, &originalPixelB);
-					clampPixelR += originalPixelR * (*kernel)((double)k - (double)i/scale); // I'm smart enough to know the error is here...
-					clampPixelG += originalPixelG * (*kernel)((double)k - (double)i/scale); // ...but not smart enough to know how to fix it
-					clampPixelB += originalPixelB * (*kernel)((double)k - (double)i/scale);
+					clampPixelR += originalPixelR * (*kernel)(((int)round((double)(i)/scale) + k) - (double)i/scale); // I'm smart enough to know the error is here...
+					clampPixelG += originalPixelG * (*kernel)(((int)round((double)(i)/scale) + k) - (double)i/scale); // ...but not smart enough to know how to fix it
+					clampPixelB += originalPixelB * (*kernel)(((int)round((double)(i)/scale) + k) - (double)i/scale);
 					
 					printf("something: %lf, %d, %d\n", round((double)(i)/scale), ((int)round((double)(i)/scale) + k), clampPixelR);
 				}
@@ -122,7 +122,7 @@ int scaleImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double sca
 		if (j%50 == 0)
 		{
 			SDL_UpdateWindowSurface(winIntermediate);
-			SDL_Delay(10000);
+			// SDL_Delay(10000);
 		}
 	}
 
@@ -144,9 +144,9 @@ int scaleImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double sca
 				if (((int)round((double)(j)/scale) + k) >= 0 && ((int)round((double)(j)/scale) + k) < originalH)
 				{
 					SDL_GetRGB(*(Uint32*)((Uint8*)(surIntermediate->pixels) + surIntermediate->pitch * ((int)round((double)(j)/scale) + k) + surIntermediate->format->BytesPerPixel * i), surIntermediate->format, &originalPixelR, &originalPixelG, &originalPixelB);
-					clampPixelR += originalPixelR * (*kernel)((double)k - (double)j/scale);
-					clampPixelG += originalPixelG * (*kernel)((double)k - (double)j/scale);
-					clampPixelB += originalPixelB * (*kernel)((double)k - (double)j/scale);
+					clampPixelR += originalPixelR * (*kernel)(((int)round((double)(j)/scale) + k) - (double)j/scale);
+					clampPixelG += originalPixelG * (*kernel)(((int)round((double)(j)/scale) + k) - (double)j/scale);
+					clampPixelB += originalPixelB * (*kernel)(((int)round((double)(j)/scale) + k) - (double)j/scale);
 				}
 			}
 			targetPixelR = (Uint8)((clampPixelR < 0) ? (0) : ((clampPixelR > 255) ? (255) : (clampPixelR)));
@@ -157,7 +157,7 @@ int scaleImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double sca
 		if (i%50 == 0)
 		{
 			SDL_UpdateWindowSurface(winIntermediate);
-			SDL_Delay(330);
+			// SDL_Delay(330);
 		}
 	}
 
