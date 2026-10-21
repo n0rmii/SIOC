@@ -169,6 +169,71 @@ int scaleImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double sca
 	return 0;
 }
 
+int rotateImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double angle, int pivotX, int pivotY, double (*kernel)(double))
+{
+	SDL_FillRect( surTransformed, NULL, SDL_MapRGB(surTransformed->format, 0, 0, 0 ));
+	int originalW = surOriginal->w;
+	int originalH = surOriginal->h;
+	int iprim, jprim;
+	double xprim, yprim;
+	Uint32 *targetPixel, *sourcePixel;
+	Uint8 *pivotPtr, *pivotPtrTransformed;
+	Uint8 targetPixelR, targetPixelG, targetPixelB, originalPixelR, originalPixelG, originalPixelB;
+	int clampPixelR, clampPixelG, clampPixelB, n;
+
+	if (pivotX <= -originalW/2 || pivotY <= -originalH/2 || pivotX >= originalW/2 || pivotY >= originalH/2)
+	{
+		printf("Error rotating image: invalid pivot: width: %d, pivot X: %d, height: %d pivot Y: %d\n", originalW, pivotX, originalH, pivotY);
+		return 1;
+	}
+	
+	pivotPtr = (Uint8*)(surOriginal->pixels) + surOriginal->pitch * (originalH/2 + pivotY) + surOriginal->format->BytesPerPixel * (originalW/2 + pivotX);
+	pivotPtrTransformed = (Uint8*)(surTransformed->pixels) + surTransformed->pitch * (originalH/2 + pivotY) + surTransformed->format->BytesPerPixel * (originalW/2 + pivotX);
+
+	for (int j = -originalH/2; j < originalH/2; j++)
+	{
+		for (int i = -originalW/2; i < originalW/2; i++)
+		{
+			targetPixel = (Uint32*)(pivotPtrTransformed + surTransformed->pitch * j + surTransformed->format->BytesPerPixel * i);
+
+			targetPixelR = 0;
+			targetPixelG = 0;
+			targetPixelB = 0;
+			clampPixelR = 0;
+			clampPixelG = 0;
+			clampPixelB = 0;
+
+			// x' = x*cos(a) + y*sin(a)   y' = x*-sin(a) + y*cos(a)
+			yprim = -i * sin(angle) + j * cos(angle);
+			jprim = (int)round(yprim);
+			xprim = i * cos(angle) + j * sin(angle);
+			iprim = (int)round(xprim);
+			for (int m = -KERNEL_RADIUS; m <= KERNEL_RADIUS; m++)
+			{
+				for (int n = -KERNEL_RADIUS; n <= KERNEL_RADIUS; n++)
+				{
+					if (iprim+m >= -originalW/2 && iprim+m < originalW/2 && jprim+n >= -originalH/2 && jprim+n < originalH/2)
+					{
+						sourcePixel = (Uint32*)(pivotPtr + surOriginal->pitch * (jprim+n) + surOriginal->format->BytesPerPixel * (iprim+m));
+						SDL_GetRGB(*sourcePixel, surOriginal->format, &originalPixelR, &originalPixelG, &originalPixelB);
+
+						clampPixelR += originalPixelR * (*kernel)(xprim - (iprim+m)) * (*kernel)(yprim - (jprim+n));
+						clampPixelG += originalPixelG * (*kernel)(xprim - (iprim+m)) * (*kernel)(yprim - (jprim+n));
+						clampPixelB += originalPixelB * (*kernel)(xprim - (iprim+m)) * (*kernel)(yprim - (jprim+n));
+					}
+					
+				}
+			}
+			targetPixelR = (Uint8)((clampPixelR < 0) ? (0) : ((clampPixelR > 255) ? (255) : (clampPixelR)));
+			targetPixelG = (Uint8)((clampPixelG < 0) ? (0) : ((clampPixelG > 255) ? (255) : (clampPixelG)));
+			targetPixelB = (Uint8)((clampPixelB < 0) ? (0) : ((clampPixelB > 255) ? (255) : (clampPixelB)));
+			*targetPixel = SDL_MapRGB(surTransformed->format, targetPixelR, targetPixelG, targetPixelB);
+		}
+	}
+
+	return 0;
+}
+
 int main()
 {
 	SDL_Surface* surOriginal = NULL;
@@ -231,10 +296,10 @@ int main()
 
 	int originalW = surImage->w;
 	int originalH = surImage->h;
-	int transformedW = round(originalW * userScale)-1;
-	int transformedH = round(originalH * userScale)-1;
-	// int transformedW = originalW * userScale;
-	// int transformedH = originalH * userScale;
+	// int transformedW = round(originalW * userScale)-1;
+	// int transformedH = round(originalH * userScale)-1;
+	int transformedW = originalW;
+	int transformedH = originalH;
 
 	winOriginal = SDL_CreateWindow( "Original", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, originalW + 2*SCREEN_MARGIN, originalH + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
 	winWindow = SDL_CreateWindow( "Window", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, transformedW + 2*SCREEN_MARGIN, transformedH + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
@@ -265,17 +330,17 @@ int main()
 	SDL_BlitSurface(surImage, NULL, surOriginal, &newImgPos);
 	SDL_FreeSurface(surImage);
 
-	if (scaleImage(surOriginal, surWindow, userScale, &kernelWindow))
+	if (rotateImage(surOriginal, surWindow, userScale, 0, 0, &kernelWindow))
 	{
 		printf("Error in window\n");
 		return 1;
 	}
-	if (scaleImage(surOriginal, surTent, userScale, &kernelTent))
+	if (rotateImage(surOriginal, surTent, userScale, 0, 0, &kernelTent))
 	{
 		printf("Error in tent\n");
 		return 1;
 	}
-	if (scaleImage(surOriginal, surKeys, userScale, &kernelKeys))
+	if (rotateImage(surOriginal, surKeys, userScale, 0, 0, &kernelKeys))
 	{
 		printf("Error in keys\n");
 		return 1;
