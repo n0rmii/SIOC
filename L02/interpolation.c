@@ -389,7 +389,7 @@ int main()
 	// IMG_SavePNG(surTent, tentFilename);
 	// IMG_SavePNG(surKeys, keysFilename);
 
-	SDL_Delay(5000);
+	// SDL_Delay(5000);
 
 	// do // main loop
 	// {
