@@ -306,12 +306,14 @@ int main()
 
 	int imgW = surImage->w;
 	int imgH = surImage->h;
-	int originalW = round(sqrt(imgW*imgW + imgH*imgH));
-	int originalH = originalW;
-	// int transformedW = round(originalW * userScale);
-	// int transformedH = round(originalH * userScale);
-	int transformedW = originalW;
-	int transformedH = originalH;
+	int originalW = imgW;
+	int originalH = imgH;
+	// int originalW = round(sqrt(imgW*imgW + imgH*imgH));
+	// int originalH = originalW;
+	int transformedW = round(originalW * userScale);
+	int transformedH = round(originalH * userScale);
+	// int transformedW = originalW;
+	// int transformedH = originalH;
 
 	winOriginal = SDL_CreateWindow( "Original", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, originalW + 2*SCREEN_MARGIN, originalH + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
 	winTransformed = SDL_CreateWindow( "Transformed", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, transformedW + 2*SCREEN_MARGIN, transformedH + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
@@ -346,8 +348,10 @@ int main()
 	}
 
 	SDL_Rect newImgPos;
-	newImgPos.x = originalW/2 - imgW/2;
-	newImgPos.y = originalH/2 - imgH/2; // width and height should be ignored according to wiki, so im only setting offset
+	newImgPos.x = 0;
+	newImgPos.y = 0;
+	// newImgPos.x = originalW/2 - imgW/2;
+	// newImgPos.y = originalH/2 - imgH/2; // width and height should be ignored according to wiki, so im only setting offset
 	SDL_BlitSurface(surImage, NULL, surOriginal, &newImgPos);
 	SDL_FreeSurface(surImage);
 
@@ -367,43 +371,43 @@ int main()
 	// 	return 1;
 	// }
 	// 0.90909090909091
-	userScale = (12.0/360.0)*2.0*M_PI;
+	// userScale = (12.0/360.0)*2.0*M_PI;
 	switch (userKernel)
 	{
 	case 'w':
 
-		for (int i = 0; i < 15; i++)
-		{
-			(void)rotateImage(surOriginal, surTransformed, userScale, 0, 0, &kernelWindow);
-			SDL_UpdateWindowSurface(winTransformed);
-			printf("Step: %d\n", i*2);
-			(void)rotateImage(surTransformed, surOriginal, userScale, 0, 0, &kernelWindow);
-			SDL_UpdateWindowSurface(winOriginal);
-			printf("Step: %d\n", i*2 + 1);
-		}
+		// for (int i = 0; i < 15; i++)
+		// {
+		// 	(void)rotateImage(surOriginal, surTransformed, userScale, 0, 0, &kernelWindow);
+		// 	SDL_UpdateWindowSurface(winTransformed);
+		// 	printf("Step: %d\n", i*2);
+		// 	(void)rotateImage(surTransformed, surOriginal, userScale, 0, 0, &kernelWindow);
+		// 	SDL_UpdateWindowSurface(winOriginal);
+		// 	printf("Step: %d\n", i*2 + 1);
+		// }
 		
 
-		// (void)scaleImage(surOriginal, surTransformed, userScale, &kernelWindow);
+		(void)scaleImage(surOriginal, surTransformed, userScale, &kernelWindow);
 		break;
 	case 't':
-		for (int i = 0; i < 15; i++)
-		{
-			(void)rotateImage(surOriginal, surTransformed, userScale, 0, 0, &kernelTent);
-			SDL_UpdateWindowSurface(winTransformed);
-			(void)rotateImage(surTransformed, surOriginal, userScale, 0, 0, &kernelTent);
-			SDL_UpdateWindowSurface(winOriginal);
-		}
-		// (void)scaleImage(surOriginal, surTransformed, userScale, &kernelTent);
+		// for (int i = 0; i < 15; i++)
+		// {
+		// 	(void)rotateImage(surOriginal, surTransformed, userScale, 0, 0, &kernelTent);
+		// 	SDL_UpdateWindowSurface(winTransformed);
+		// 	(void)rotateImage(surTransformed, surOriginal, userScale, 0, 0, &kernelTent);
+		// 	SDL_UpdateWindowSurface(winOriginal);
+		// }
+		(void)scaleImage(surOriginal, surTransformed, userScale, &kernelTent);
 		break;
 	case 'k':
-		for (int i = 0; i < 15; i++)
-		{
-			(void)rotateImage(surOriginal, surTransformed, userScale, 0, 0, &kernelKeys);
-			SDL_UpdateWindowSurface(winTransformed);
-			(void)rotateImage(surTransformed, surOriginal, userScale, 0, 0, &kernelKeys);
-			SDL_UpdateWindowSurface(winOriginal);
-		}
-		// (void)scaleImage(surOriginal, surTransformed, userScale, &kernelKeys);
+		// for (int i = 0; i < 15; i++)
+		// {
+		// 	(void)rotateImage(surOriginal, surTransformed, userScale, 0, 0, &kernelKeys);
+		// 	SDL_UpdateWindowSurface(winTransformed);
+		// 	(void)rotateImage(surTransformed, surOriginal, userScale, 0, 0, &kernelKeys);
+		// 	SDL_UpdateWindowSurface(winOriginal);
+		// }
+		(void)scaleImage(surOriginal, surTransformed, userScale, &kernelKeys);
 		break;
 	
 	default:
@@ -419,7 +423,7 @@ int main()
 	// SDL_UpdateWindowSurface(winTent);
 	// SDL_UpdateWindowSurface(winKeys);
 	
-	IMG_SavePNG(surOriginal, transformedFilename);
+	IMG_SavePNG(surTransformed, transformedFilename);
 	// IMG_SavePNG(surWindow, windowFilename); // PNG supremacy
 	// IMG_SavePNG(surTent, tentFilename);
 	// IMG_SavePNG(surKeys, keysFilename);
