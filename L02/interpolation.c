@@ -10,6 +10,12 @@
 #define SCREEN_MARGIN 0 // Hopefully won't be needed
 #define KERNEL_RADIUS 3
 
+Uint8 clampToByte(double x)
+{
+	x = round(x);
+	return (Uint8)((x < 0) ? (0) : ((x > 255) ? (255) : (x)));
+}
+
 double kernelWindow(double x)
 {
 	if (x >= 0.5 || x < -0.5)
@@ -86,7 +92,8 @@ int scaleImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double sca
 
 	Uint32* targetPixel;
 	Uint8 targetPixelR, targetPixelG, targetPixelB, originalPixelR, originalPixelG, originalPixelB;
-	int clampPixelR, clampPixelG, clampPixelB, n;
+	double clampPixelR, clampPixelG, clampPixelB, weight;
+	int n;
 
 	//stretching horizontally
 	for (int j = 0; j < originalH; j++)
@@ -108,15 +115,16 @@ int scaleImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double sca
 				if (n >= 0 && n < originalW)
 				{
 					SDL_GetRGB(*(Uint32*)((Uint8*)(surOriginal->pixels) + surOriginal->pitch * j + surOriginal->format->BytesPerPixel * n), surOriginal->format, &originalPixelR, &originalPixelG, &originalPixelB);
-					clampPixelR += originalPixelR * (*kernel)(n - (double)i/scale); // I'm smart enough to know the error is here...
-					clampPixelG += originalPixelG * (*kernel)(n - (double)i/scale); // ...but not smart enough to know how to fix it
-					clampPixelB += originalPixelB * (*kernel)(n - (double)i/scale);
+					weight = (*kernel)(n - (double)i/scale);
+					clampPixelR += (double)originalPixelR * weight; // I'm smart enough to know the error is here...
+					clampPixelG += (double)originalPixelG * weight; // ...but not smart enough to know how to fix it
+					clampPixelB += (double)originalPixelB * weight;
 				}
 				// SDL_Delay(30);
 			}
-			targetPixelR = (Uint8)((clampPixelR < 0) ? (0) : ((clampPixelR > 255) ? (255) : (clampPixelR)));
-			targetPixelG = (Uint8)((clampPixelG < 0) ? (0) : ((clampPixelG > 255) ? (255) : (clampPixelG)));
-			targetPixelB = (Uint8)((clampPixelB < 0) ? (0) : ((clampPixelB > 255) ? (255) : (clampPixelB)));
+			targetPixelR = clampToByte(clampPixelR);
+			targetPixelG = clampToByte(clampPixelG);
+			targetPixelB = clampToByte(clampPixelB);
 			*targetPixel = SDL_MapRGB(surIntermediate->format, targetPixelR, targetPixelG, targetPixelB);
 		}
 		if (j%50 == 0)
@@ -145,22 +153,18 @@ int scaleImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double sca
 				if (n >= 0 && n < originalH)
 				{
 					SDL_GetRGB(*(Uint32*)((Uint8*)(surIntermediate->pixels) + surIntermediate->pitch * n + surIntermediate->format->BytesPerPixel * i), surIntermediate->format, &originalPixelR, &originalPixelG, &originalPixelB);
-					clampPixelR += originalPixelR * (*kernel)(n - (double)j/scale);
-					clampPixelG += originalPixelG * (*kernel)(n - (double)j/scale);
-					clampPixelB += originalPixelB * (*kernel)(n - (double)j/scale);
+					weight = (*kernel)(n - (double)j/scale);
+					clampPixelR += (double)originalPixelR * weight;
+					clampPixelG += (double)originalPixelG * weight;
+					clampPixelB += (double)originalPixelB * weight;
 					
 					// printf("something: %lf, %d, %d\n", round((double)(j)/scale), n, clampPixelR);
 				}
 			}
-			targetPixelR = (Uint8)((clampPixelR < 0) ? (0) : ((clampPixelR > 255) ? (255) : (clampPixelR)));
-			targetPixelG = (Uint8)((clampPixelG < 0) ? (0) : ((clampPixelG > 255) ? (255) : (clampPixelG)));
-			targetPixelB = (Uint8)((clampPixelB < 0) ? (0) : ((clampPixelB > 255) ? (255) : (clampPixelB)));
+			targetPixelR = clampToByte(clampPixelR);
+			targetPixelG = clampToByte(clampPixelG);
+			targetPixelB = clampToByte(clampPixelB);
 			*targetPixel = SDL_MapRGB(surIntermediate->format, targetPixelR, targetPixelG, targetPixelB);
-		}
-		if (i%50 == 0)
-		{
-			// SDL_UpdateWindowSurface(winIntermediate); // I cant update winTransformed guhhhhh
-			// SDL_Delay(330);
 		}
 	}
 
@@ -179,7 +183,7 @@ int rotateImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double an
 	Uint32 *targetPixel, *sourcePixel;
 	Uint8 *pivotPtr, *pivotPtrTransformed;
 	Uint8 targetPixelR, targetPixelG, targetPixelB, originalPixelR, originalPixelG, originalPixelB;
-	int clampPixelR, clampPixelG, clampPixelB, n;
+	double clampPixelR, clampPixelG, clampPixelB, weight;
 
 	if (pivotX <= -originalW/2 || pivotY <= -originalH/2 || pivotX >= originalW/2 || pivotY >= originalH/2)
 	{
@@ -217,16 +221,17 @@ int rotateImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double an
 						sourcePixel = (Uint32*)(pivotPtr + surOriginal->pitch * (jprim+n) + surOriginal->format->BytesPerPixel * (iprim+m));
 						SDL_GetRGB(*sourcePixel, surOriginal->format, &originalPixelR, &originalPixelG, &originalPixelB);
 
-						clampPixelR += originalPixelR * (*kernel)(xprim - (iprim+m)) * (*kernel)(yprim - (jprim+n));
-						clampPixelG += originalPixelG * (*kernel)(xprim - (iprim+m)) * (*kernel)(yprim - (jprim+n));
-						clampPixelB += originalPixelB * (*kernel)(xprim - (iprim+m)) * (*kernel)(yprim - (jprim+n));
+						weight = (*kernel)(xprim - (iprim+m)) * (*kernel)(yprim - (jprim+n));
+						clampPixelR += (double)originalPixelR * weight;
+						clampPixelG += (double)originalPixelG * weight;
+						clampPixelB += (double)originalPixelB * weight;
 					}
 					
 				}
 			}
-			targetPixelR = (Uint8)((clampPixelR < 0) ? (0) : ((clampPixelR > 255) ? (255) : (clampPixelR)));
-			targetPixelG = (Uint8)((clampPixelG < 0) ? (0) : ((clampPixelG > 255) ? (255) : (clampPixelG)));
-			targetPixelB = (Uint8)((clampPixelB < 0) ? (0) : ((clampPixelB > 255) ? (255) : (clampPixelB)));
+			targetPixelR = clampToByte(clampPixelR);
+			targetPixelG = clampToByte(clampPixelG);
+			targetPixelB = clampToByte(clampPixelB);
 			*targetPixel = SDL_MapRGB(surTransformed->format, targetPixelR, targetPixelG, targetPixelB);
 		}
 	}
@@ -371,8 +376,10 @@ int main()
 		{
 			(void)rotateImage(surOriginal, surTransformed, userScale, 0, 0, &kernelWindow);
 			SDL_UpdateWindowSurface(winTransformed);
+			printf("Step: %d\n", i*2);
 			(void)rotateImage(surTransformed, surOriginal, userScale, 0, 0, &kernelWindow);
 			SDL_UpdateWindowSurface(winOriginal);
+			printf("Step: %d\n", i*2 + 1);
 		}
 		
 
