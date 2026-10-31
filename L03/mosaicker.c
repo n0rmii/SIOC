@@ -3,19 +3,19 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 
-typedef enum Channel_e {
-	R,
-	G,
-	B
-} Channel;
+#define CH_R 0b0001U
+#define CH_G 0b0010U
+#define CH_B 0b0100U
 
 typedef struct CFA_s {
 	Uint8 w, h;
-	Uint8 *pattern;
+	Uint8 ***pattern;
 } CFA;
 
-void getCFAChannel(SDL_Surface *surOriginal, SDL_Surface *surMosaic, CFA *filter, Channel channel)
+void getCFAChannel(SDL_Surface *surOriginal, SDL_Surface *surMosaic, CFA *filter, unsigned int channels)
 {
+	Uint32 *targetPixel, *sourcePixel;
+	Uint8 targetPixelR, targetPixelG, targetPixelB, originalPixelR, originalPixelG, originalPixelB;
 	SDL_FillRect( surMosaic, NULL, SDL_MapRGB(surMosaic->format, 0, 0, 0));
 
 	// int wByFilter = ceilf(surOriginal->w / filter->w);
@@ -25,10 +25,28 @@ void getCFAChannel(SDL_Surface *surOriginal, SDL_Surface *surMosaic, CFA *filter
 	{
 		for (int i = 0; i < surOriginal->w; i++)
 		{
-			
+			sourcePixel = (Uint32*)((Uint8*)(surOriginal->pixels) + surOriginal->pitch * j + surOriginal->format->BytesPerPixel * i);
+			targetPixel = (Uint32*)((Uint8*)(surMosaic->pixels) + surMosaic->pitch * j + surMosaic->format->BytesPerPixel * i);
+			targetPixelR = 0;
+			targetPixelG = 0;
+			targetPixelB = 0;
+
+			SDL_GetRGB(*sourcePixel, surOriginal->format, &originalPixelR, &originalPixelG, &originalPixelB);
+			if (channels & CH_R)
+			{
+				targetPixelR = originalPixelR * filter->pattern[0][j % filter->h][i % filter->w];
+			}
+			if (channels & CH_G)
+			{
+				targetPixelG = originalPixelG * filter->pattern[1][j % filter->h][i % filter->w];
+			}
+			if (channels & CH_B)
+			{
+				targetPixelB = originalPixelB * filter->pattern[2][j % filter->h][i % filter->w];
+			}
+			*targetPixel = SDL_MapRGB(surMosaic->format, targetPixelR, targetPixelG, targetPixelB);
 		}
 	}
-	
 }
 
 int main(int argc, char *argv[])
@@ -80,6 +98,19 @@ int main(int argc, char *argv[])
 	SDL_Window *winOriginal = NULL;
 	SDL_Surface *surMosaic = NULL;
 	SDL_Window *winMosaic = NULL;
+
+	if (argc != 5)
+	{
+		printf("Error getting program arguments! argc: %d\n");
+		for (int i = 1; i < argc; i++)
+		{
+			printf("%s\n", argv[i]);
+		}
+		return 1;
+	}
+
+	
+	
 
 	if ( SDL_Init( SDL_INIT_EVERYTHING ) < 0 ) {
 		printf("Error initializing SDL: %s\n", SDL_GetError());
