@@ -99,6 +99,14 @@ int main(int argc, char *argv[])
 	SDL_Surface *surMosaic = NULL;
 	SDL_Window *winMosaic = NULL;
 
+	char c_userCFA = 0;
+	char c_userChannel = 0;
+	char *c_userInputFilename = NULL;
+	char *c_userOutputFilename = NULL;
+
+	CFA *userCFA = NULL;
+	unsigned int userChannel = 0;
+
 	if (argc != 5)
 	{
 		printf("Error getting program arguments! argc: %d\n");
@@ -109,8 +117,11 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	
-	
+	c_userCFA = argv[1][0];
+	c_userChannel = argv[2][0];
+	c_userInputFilename = argv[3];
+	c_userOutputFilename = argv[4];
+
 
 	if ( SDL_Init( SDL_INIT_EVERYTHING ) < 0 ) {
 		printf("Error initializing SDL: %s\n", SDL_GetError());
@@ -149,7 +160,48 @@ int main(int argc, char *argv[])
 	SDL_BlitSurface(surImage, NULL, surOriginal, &newImgPos);
 	SDL_FreeSurface(surImage);
 
+	if (c_userCFA == 'x' || c_userCFA == 'X')
+	{
+		userCFA = &CFAXTrans;
+	}
+	else if (c_userCFA == 'b' || c_userCFA == 'B')
+	{
+		userCFA = &CFABayer;
+	}
+	else
+	{
+		printf("Wrong CFA identifier: %c\n", c_userCFA);
+			SDL_DestroyWindow(winMosaic);
+		SDL_DestroyWindow(winOriginal);
 
+		SDL_Quit();
+		return 1;
+	}
+
+	if (c_userChannel == 'r' || c_userChannel == 'R')
+	{
+		userChannel = CH_R;
+	}
+	else if (c_userChannel == 'g' || c_userChannel == 'G')
+	{
+		userChannel = CH_G;
+	}
+	else if (c_userChannel == 'b' || c_userChannel == 'B')
+	{
+		userChannel = CH_B;
+	}
+	else
+	{
+		printf("Wrong channel identifier: %c\n", c_userChannel);
+			SDL_DestroyWindow(winMosaic);
+		SDL_DestroyWindow(winOriginal);
+
+		SDL_Quit();
+		return 1;
+	}
+
+	
+	
 
 	SDL_DestroyWindow(winMosaic);
 	SDL_DestroyWindow(winOriginal);
