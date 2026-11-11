@@ -239,43 +239,40 @@ int rotateImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double an
 	return 0;
 }
 
-int main()
+int main(int argc, char *argv[])
 {
 	SDL_Surface* surOriginal = NULL;
 	SDL_Window* winOriginal = NULL;
 	SDL_Surface* surTransformed = NULL;
 	SDL_Window* winTransformed = NULL;
-	SDL_Surface* surWindow = NULL;
-	SDL_Window* winWindow = NULL;
-	SDL_Surface* surTent = NULL;
-	SDL_Window* winTent = NULL;
-	SDL_Surface* surKeys = NULL;
-	SDL_Window* winKeys = NULL;
 
 	SDL_Surface* surImage = NULL;
 
-	SDL_Event event;
-
-	Uint32 msPerFrame = 1000 / SCREEN_FPS;
-
-	int quit = 0;
-	const char originalFilename[70] = {0};
-	const char transformedFilename[100] = {0};
-	const char windowFilename[130] = "C3window.png";
-	const char tentFilename[130] = "C3tent.png";
-	const char keysFilename[130] = "C3keys.png";
+	char originalFilename[70] = {0};
+	char transformedFilename[100] = {0};
 	double userScale = 1.0;
 	char userKernel = 'w';
-	const char userScaleStr[30] = {0};
 
-	printf("Please enter the kernel letter: ");
-	scanf("%c", &userKernel);
-	printf("Enter the original image's filename: ");
-	scanf("%69s", originalFilename);
-	printf("Enter the transformed image's filename: ");
-	scanf("%99s", transformedFilename);
-	printf("Please enter the scaling factor: ");
-	scanf("%lf", &userScale);
+	if (argc != 5)
+	{
+		printf("Incorrect number of arguments: %d\n", argc);
+		return 1;
+	}
+	
+	userKernel = argv[1][0];
+	userScale = atof(argv[2]);
+
+	strncpy(originalFilename, argv[3], 70);
+	strncpy(transformedFilename, argv[4], 100);
+
+	// printf("Please enter the kernel letter: ");
+	// scanf("%c", &userKernel);
+	// printf("Enter the original image's filename: ");
+	// scanf("%69s", originalFilename);
+	// printf("Enter the transformed image's filename: ");
+	// scanf("%99s", transformedFilename);
+	// printf("Please enter the scaling factor: ");
+	// scanf("%lf", &userScale);
 
 
 	if ( SDL_Init( SDL_INIT_EVERYTHING ) < 0 ) {
@@ -289,18 +286,6 @@ int main()
 		printf("Error loading image: %s\n", SDL_GetError());
 		return 1;
 	}
-	/*sprintf(userScaleStr, "%lf", userScale); // This is all very janky string concating so I won't be surprised by segfaults here
-	strcat(windowFilename, userScaleStr);
-	strcat(windowFilename, "_");
-	strcat(windowFilename, originalFilename);
-
-	strcat(tentFilename, userScaleStr);
-	strcat(tentFilename, "_");
-	strcat(tentFilename, originalFilename);
-
-	strcat(keysFilename, userScaleStr);
-	strcat(keysFilename, "_");
-	strcat(keysFilename, originalFilename);*/
 
 	int imgW = surImage->w;
 	int imgH = surImage->h;
@@ -315,14 +300,7 @@ int main()
 
 	winOriginal = SDL_CreateWindow( "Original", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, originalW + 2*SCREEN_MARGIN, originalH + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
 	winTransformed = SDL_CreateWindow( "Transformed", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, transformedW + 2*SCREEN_MARGIN, transformedH + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
-	// winWindow = SDL_CreateWindow( "Window", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, transformedW + 2*SCREEN_MARGIN, transformedH + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
-	// winTent = SDL_CreateWindow( "Tent", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, transformedW + 2*SCREEN_MARGIN, transformedH + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
-	// winKeys = SDL_CreateWindow( "Keys", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, transformedW + 2*SCREEN_MARGIN, transformedH + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
-	// Make sure creating the winOriginal succeeded
-	// if (!winOriginal || !winWindow || !winTent || !winKeys) {
-	// 	printf("Error creating window: %s\n", SDL_GetError());
-	// 	return 1;
-	// }
+
 	if (!winOriginal || !winTransformed) {
 		printf("Error creating window: %s\n", SDL_GetError());
 		return 1;
@@ -331,15 +309,7 @@ int main()
 	// Get the surface from the winOriginal
 	surOriginal = SDL_GetWindowSurface(winOriginal);
 	surTransformed = SDL_GetWindowSurface(winTransformed);
-	surWindow = SDL_GetWindowSurface(winWindow);
-	surTent = SDL_GetWindowSurface(winTent);
-	surKeys = SDL_GetWindowSurface(winKeys);
 
-	// Make sure getting the surface succeeded
-	// if (!surOriginal || !surWindow || !surTent || !surKeys) {
-	// 	printf("Error getting surface: %s\n", SDL_GetError());
-	// 	return 1;
-	// }
 	if (!surOriginal || !surTransformed) {
 		printf("Error getting surface: %s\n", SDL_GetError());
 		return 1;
@@ -352,22 +322,6 @@ int main()
 	// newImgPos.y = originalH/2 - imgH/2; // width and height should be ignored according to wiki, so im only setting offset
 	SDL_BlitSurface(surImage, NULL, surOriginal, &newImgPos);
 	SDL_FreeSurface(surImage);
-
-	// if (rotateImage(surOriginal, surWindow, userScale, 0, 0, &kernelWindow))
-	// {
-	// 	printf("Error in window\n");
-	// 	return 1;
-	// }
-	// if (rotateImage(surOriginal, surTent, userScale, 0, 0, &kernelTent))
-	// {
-	// 	printf("Error in tent\n");
-	// 	return 1;
-	// }
-	// if (rotateImage(surOriginal, surKeys, userScale, 0, 0, &kernelKeys))
-	// {
-	// 	printf("Error in keys\n");
-	// 	return 1;
-	// }
 	// 0.90909090909091
 	// userScale = (12.0/360.0)*2.0*M_PI;
 	switch (userKernel)
@@ -417,73 +371,11 @@ int main()
 
 	SDL_UpdateWindowSurface(winOriginal);
 	SDL_UpdateWindowSurface(winTransformed);
-	// SDL_UpdateWindowSurface(winWindow);
-	// SDL_UpdateWindowSurface(winTent);
-	// SDL_UpdateWindowSurface(winKeys);
 	
 	IMG_SavePNG(surTransformed, transformedFilename);
-	// IMG_SavePNG(surWindow, windowFilename); // PNG supremacy
-	// IMG_SavePNG(surTent, tentFilename);
-	// IMG_SavePNG(surKeys, keysFilename);
-
-	// SDL_Delay(5000);
-
-	// do // main loop
-	// {
-	// 	SDL_UpdateWindowSurface(winOriginal);
-	// 	// SDL_UpdateWindowSurface(winIntermediate);
-	// 	SDL_UpdateWindowSurface(winWindow);
-	// 	SDL_UpdateWindowSurface(winTent);
-	// 	SDL_UpdateWindowSurface(winKeys);
-		
-	// 	SDL_Delay(msPerFrame);
-	// 	SDL_PollEvent(&event);
-	// 		//Handle events on queue
-	// 	while( SDL_PollEvent( &event ) != 0 )
-	// 	{
-	// 		//User requests quit
-	// 		// printf("Event: %d\n", event.type);
-	// 		if( event.type == SDL_QUIT )
-	// 		{
-	// 			quit = 1;
-	// 		}
-	// 		else if( event.type == SDL_WINDOWEVENT )
-	// 		{
-	// 			// Sprawdzenie, czy zdarzenie dotyczy żądania zamknięcia okna
-	// 			if( event.window.event == SDL_WINDOWEVENT_CLOSE )
-	// 			{
-	// 				// Pobranie wskaźnika na konkretne okno na podstawie jego ID
-	// 				SDL_Window* windowToClose = SDL_GetWindowFromID(event.window.windowID);
-	// 				if( windowToClose != NULL )
-	// 				{
-	// 					SDL_DestroyWindow( windowToClose );
-	// 				}
-	// 			}
-	// 		}
-	// 	}
-	// } while (!quit);
-	
-
-	// do // end loop to keep displaying the changes
-	// {
-	// 	SDL_UpdateWindowSurface(winOriginal);
-	// 	SDL_UpdateWindowSurface(winTransformed);
-	// 	SDL_Delay(msPerFrame);
-	// 	while( SDL_PollEvent( &event ) != 0 )
-	// 	{
-	// 		//User requests quit
-	// 		if( event.type == SDL_QUIT )
-	// 		{
-	// 			quit = 1;
-	// 		}
-	// 	}
-	// } while (!quit);
 	
 	SDL_DestroyWindow(winOriginal);
 	SDL_DestroyWindow(winTransformed);
-	// SDL_DestroyWindow(winWindow);
-	// SDL_DestroyWindow(winTent);
-	// SDL_DestroyWindow(winKeys);
 	SDL_Quit();
 
 	return 0;
