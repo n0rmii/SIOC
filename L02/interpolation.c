@@ -67,7 +67,7 @@ double kernelKeys(double x)
 	}
 }
 
-int scaleImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double scale, double (*kernel)(double))
+int interpolateImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double scale, double (*kernel)(double))
 {
 	SDL_Surface* surIntermediate = NULL;
 	SDL_Window* winIntermediate = NULL;
@@ -327,7 +327,7 @@ int main(int argc, char *argv[])
 	switch (userKernel)
 	{
 	case 'w':
-
+	case 'W':
 		// for (int i = 0; i < 15; i++)
 		// {
 		// 	(void)rotateImage(surOriginal, surTransformed, userScale, 0, 0, &kernelWindow);
@@ -337,11 +337,10 @@ int main(int argc, char *argv[])
 		// 	SDL_UpdateWindowSurface(winOriginal);
 		// 	printf("Step: %d\n", i*2 + 1);
 		// }
-		
-
-		(void)scaleImage(surOriginal, surTransformed, userScale, &kernelWindow);
+		(void)interpolateImage(surOriginal, surTransformed, userScale, &kernelWindow);
 		break;
 	case 't':
+	case 'T':
 		// for (int i = 0; i < 15; i++)
 		// {
 		// 	(void)rotateImage(surOriginal, surTransformed, userScale, 0, 0, &kernelTent);
@@ -349,9 +348,10 @@ int main(int argc, char *argv[])
 		// 	(void)rotateImage(surTransformed, surOriginal, userScale, 0, 0, &kernelTent);
 		// 	SDL_UpdateWindowSurface(winOriginal);
 		// }
-		(void)scaleImage(surOriginal, surTransformed, userScale, &kernelTent);
+		(void)interpolateImage(surOriginal, surTransformed, userScale, &kernelTent);
 		break;
 	case 'k':
+	case 'K':
 		// for (int i = 0; i < 15; i++)
 		// {
 		// 	(void)rotateImage(surOriginal, surTransformed, userScale, 0, 0, &kernelKeys);
@@ -359,12 +359,14 @@ int main(int argc, char *argv[])
 		// 	(void)rotateImage(surTransformed, surOriginal, userScale, 0, 0, &kernelKeys);
 		// 	SDL_UpdateWindowSurface(winOriginal);
 		// }
-		(void)scaleImage(surOriginal, surTransformed, userScale, &kernelKeys);
+		(void)interpolateImage(surOriginal, surTransformed, userScale, &kernelKeys);
 		break;
-	
 	default:
-	printf("Goddamn scanf: '%c'\n", userKernel);
-	return 1;
+		printf("Goddamn scanf: '%c'\n", userKernel);
+		SDL_DestroyWindow(winOriginal);
+		SDL_DestroyWindow(winTransformed);
+		SDL_Quit();
+		return 1;
 		break;
 	}
 	
