@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
+// #include <stdlib.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 
@@ -20,10 +21,15 @@ typedef struct CFA_s {
 	Uint8 *pattern;
 } CFA;
 
-Uint8 CFAMask (CFA *filter, unsigned int x, unsigned int y, unsigned int channel)
+Uint8 getCFAMask(CFA *filter, unsigned int x, unsigned int y, unsigned int channel)
 {
 	return *(filter->pattern + (channel * filter->h * filter->w) + filter->w * (y % filter->h) + x % filter->w);
 }
+
+double *getDArrPointer(double *array, unsigned int width, unsigned int height, unsigned int x, unsigned int y, unsigned int channel)
+{
+	return array + (channel * width * height) + (width * y) + (x);
+} // Funky little thing innit?
 
 Uint8 clampToByte(double x)
 {
@@ -84,33 +90,37 @@ double kernelKeys(double x)
 
 int interpolateImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, double scale, double (*kernel)(double), CFA *filter)
 {
-	SDL_Surface* surIntermediate = NULL;
-	SDL_Window* winIntermediate = NULL;
+	// SDL_Surface* surIntermediate = NULL;
+	// SDL_Window* winIntermediate = NULL;
 	int originalW = surOriginal->w;
 	int originalH = surOriginal->h;
 	// int transformedW = round(originalW * scale)-1;
 	// int transformedH = round(originalH * scale)-1;
-	int transformedW = originalW;
-	int transformedH = originalH;
+	// int transformedW = originalW;
+	// int transformedH = originalH;
+
+	double *intermediate = malloc(3 * originalW * originalH * sizeof(double));
+
+	double *weights = malloc(3 * originalW * originalH * sizeof(double)); // Weights for each channel, to be saved between horizontal and vertical interpolation
 	
 	// Creating a surface without a window is a pain so we're making a temporary one
-	winIntermediate = SDL_CreateWindow( "Intermediate", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, transformedW + 2*SCREEN_MARGIN, originalH + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
-	if (!winIntermediate) {
-		printf("Error creating window: %s\n", SDL_GetError());
-		return 1;
-	}
-	surIntermediate = SDL_GetWindowSurface(winIntermediate);
-	if (!surIntermediate) {
-		printf("Error getting surface: %s\n", SDL_GetError());
-		return 1;
-	}
-	SDL_FillRect( surIntermediate, NULL, SDL_MapRGB(surIntermediate->format, 0, 0, 0 ));
+	// winIntermediate = SDL_CreateWindow( "Intermediate", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, transformedW + 2*SCREEN_MARGIN, originalH + 2*SCREEN_MARGIN, SDL_WINDOW_SHOWN );
+	// if (!winIntermediate) {
+	// 	printf("Error creating window: %s\n", SDL_GetError());
+	// 	return 1;
+	// }
+	// surIntermediate = SDL_GetWindowSurface(winIntermediate);
+	// if (!surIntermediate) {
+	// 	printf("Error getting surface: %s\n", SDL_GetError());
+	// 	return 1;
+	// }
+	// SDL_FillRect( surIntermediate, NULL, SDL_MapRGB(surIntermediate->format, 0, 0, 0 ));
 	SDL_FillRect( surTransformed, NULL, SDL_MapRGB(surTransformed->format, 0, 0, 0 ));
 
-	Uint32* targetPixel;
+	Uint32 *targetPixel;
+	double *targetPixelDR, *targetPixelDG, *targetPixelDB, *weightDR, *weightDG, *weightDB;
 	Uint8 targetPixelR, targetPixelG, targetPixelB, originalPixelR, originalPixelG, originalPixelB;
-	double clampPixelR, clampPixelG, clampPixelB, weightR, weightG, weighB;
-	int n;
+	double intermediatePixelR, intermediatePixelG, intermediatePixelB, clampPixelR, clampPixelG, clampPixelB, weightR, weightG, weightB;
 
 	//interpolating horizontally
 
@@ -118,67 +128,51 @@ int interpolateImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, doub
 	{
 		for (int i = 0; i < originalW; i++)
 		{
-			targetPixel = (Uint32*)((Uint8*)(surIntermediate->pixels) + surIntermediate->pitch * j + surIntermediate->format->BytesPerPixel * i);
+			targetPixelDR = getDArrPointer(intermediate, originalW, originalH, i, j, CH_R);
+			targetPixelDG = getDArrPointer(intermediate, originalW, originalH, i, j, CH_G);
+			targetPixelDB = getDArrPointer(intermediate, originalW, originalH, i, j, CH_B);
+			weightDR = getDArrPointer(weights, originalW, originalH, i, j, CH_R);
+			weightDG = getDArrPointer(weights, originalW, originalH, i, j, CH_G);
+			weightDB = getDArrPointer(weights, originalW, originalH, i, j, CH_B);
 			targetPixelR = 0;
 			targetPixelG = 0;
 			targetPixelB = 0;
 			clampPixelR = 0;
 			clampPixelG = 0;
 			clampPixelB = 0;
+			weightR = 0;
+			weightG = 0;
+			weightB = 0;
 			for (int k = -KERNEL_RADIUS*ceil(scale); k <= KERNEL_RADIUS*ceil(scale); k++)
 			{
 				if (i+k < 0 || i+k >= originalW) continue;
 
+				SDL_GetRGB(*(Uint32*)((Uint8*)(surOriginal->pixels) + surOriginal->pitch * j + surOriginal->format->BytesPerPixel * (i+k)), surOriginal->format, &originalPixelR, &originalPixelG, &originalPixelB);
 				
+				clampPixelR += originalPixelR * kernel(k/scale) * getCFAMask(filter, i+k, j, CH_R);
+				weightR += kernel(k/scale) * getCFAMask(filter, i+k, j, CH_R);
 				
+				clampPixelG += originalPixelG * kernel(k/scale) * getCFAMask(filter, i+k, j, CH_G);
+				weightG += kernel(k/scale) * getCFAMask(filter, i+k, j, CH_G);
+
+				clampPixelB += originalPixelB * kernel(k/scale) * getCFAMask(filter, i+k, j, CH_B);
+				weightB += kernel(k/scale) * getCFAMask(filter, i+k, j, CH_B);
 			}
+
+			*targetPixelDR = clampPixelR;
+			*targetPixelDG = clampPixelG;
+			*targetPixelDB = clampPixelB;
+
+			*weightDR = weightR;
+			*weightDG = weightG;
+			*weightDB = weightB;
+
 		}
 	}
-	
 
-	// for (int j = 0; j < originalH; j++)
-	// {
-	// 	for (int i = 0; i < transformedW; i++)
-	// 	{
-	// 		targetPixel = (Uint32*)((Uint8*)(surIntermediate->pixels) + surIntermediate->pitch * j + surIntermediate->format->BytesPerPixel * i);
-	// 		targetPixelR = 0;
-	// 		targetPixelG = 0;
-	// 		targetPixelB = 0;
-	// 		clampPixelR = 0;
-	// 		clampPixelG = 0;
-	// 		clampPixelB = 0;
-	// 		// Going through the pixels closest to target to go from O(n^3) (atrocious) to O(n^2) (bad)
-	// 		for (int k = -KERNEL_RADIUS; k <= KERNEL_RADIUS; k++)
-	// 		{
-	// 			n = ((int)round((double)(i)/scale) + k);
-	// 			//technically i should precalucalte this otside the 'i' for-loop and store it in another array but eehhhhhh...
-	// 			if (n >= 0 && n < originalW)
-	// 			{
-	// 				SDL_GetRGB(*(Uint32*)((Uint8*)(surOriginal->pixels) + surOriginal->pitch * j + surOriginal->format->BytesPerPixel * n), surOriginal->format, &originalPixelR, &originalPixelG, &originalPixelB);
-	// 				weight = (*kernel)(n - (double)i/scale);
-	// 				clampPixelR += (double)originalPixelR * weight; // I'm smart enough to know the error is here...
-	// 				clampPixelG += (double)originalPixelG * weight; // ...but not smart enough to know how to fix it
-	// 				clampPixelB += (double)originalPixelB * weight;
-	// 			}
-	// 			// SDL_Delay(30);
-	// 		}
-	// 		targetPixelR = clampToByte(clampPixelR);
-	// 		targetPixelG = clampToByte(clampPixelG);
-	// 		targetPixelB = clampToByte(clampPixelB);
-	// 		*targetPixel = SDL_MapRGB(surIntermediate->format, targetPixelR, targetPixelG, targetPixelB);
-	// 	}
-	// 	if (j%50 == 0)
-	// 	{
-	// 		SDL_UpdateWindowSurface(winIntermediate);
-	// 		// SDL_Delay(10000);
-	// 	}
-	// }
-
-	//stretching vertically
-	//i'm doing it separately because i'm not sure it would work if i did horizontal and vertical simultaneously
-	for (int i = 0; i < transformedW; i++)
+	for (int j = 0; j < originalH; j++)
 	{
-		for (int j = 0; j < transformedH; j++)
+		for (int i = 0; i < originalW; i++)
 		{
 			targetPixel = (Uint32*)((Uint8*)(surTransformed->pixels) + surTransformed->pitch * j + surTransformed->format->BytesPerPixel * i);
 			targetPixelR = 0;
@@ -187,29 +181,75 @@ int interpolateImage(SDL_Surface* surOriginal, SDL_Surface* surTransformed, doub
 			clampPixelR = 0;
 			clampPixelG = 0;
 			clampPixelB = 0;
-			for (int k = -KERNEL_RADIUS; k <= KERNEL_RADIUS; k++)
+			weightR = 0;
+			weightG = 0;
+			weightB = 0;
+			for (int k = -KERNEL_RADIUS*ceil(scale); k <= KERNEL_RADIUS*ceil(scale); k++)
 			{
-				n = ((int)round((double)(j)/scale) + k);
-				if (n >= 0 && n < originalH)
-				{
-					SDL_GetRGB(*(Uint32*)((Uint8*)(surIntermediate->pixels) + surIntermediate->pitch * n + surIntermediate->format->BytesPerPixel * i), surIntermediate->format, &originalPixelR, &originalPixelG, &originalPixelB);
-					weight = (*kernel)(n - (double)j/scale);
-					clampPixelR += (double)originalPixelR * weight;
-					clampPixelG += (double)originalPixelG * weight;
-					clampPixelB += (double)originalPixelB * weight;
-					
-					// printf("something: %lf, %d, %d\n", round((double)(j)/scale), n, clampPixelR);
-				}
+				if (j+k < 0 || j+k >= originalH) continue;
+
+				intermediatePixelR = *getDArrPointer(intermediate, originalW, originalH, i, j+k, CH_R);
+				intermediatePixelG = *getDArrPointer(intermediate, originalW, originalH, i, j+k, CH_G);
+				intermediatePixelB = *getDArrPointer(intermediate, originalW, originalH, i, j+k, CH_B);
+
+				weightDR = getDArrPointer(weights, originalW, originalH, i, j+k, CH_R);
+				weightDG = getDArrPointer(weights, originalW, originalH, i, j+k, CH_G);
+				weightDB = getDArrPointer(weights, originalW, originalH, i, j+k, CH_B);
+
+				clampPixelR += intermediatePixelR * kernel(k/scale);
+				weightR += *weightDR * kernel(k/scale);
+				
+				clampPixelG += intermediatePixelG * kernel(k/scale);
+				weightG += *weightDG * kernel(k/scale);
+
+				clampPixelB += intermediatePixelB * kernel(k/scale);
+				weightB += *weightDB * kernel(k/scale);
 			}
-			targetPixelR = clampToByte(clampPixelR);
-			targetPixelG = clampToByte(clampPixelG);
-			targetPixelB = clampToByte(clampPixelB);
-			*targetPixel = SDL_MapRGB(surIntermediate->format, targetPixelR, targetPixelG, targetPixelB);
+			// (d > 1e-6) ? n / d : 0.0 To prevent weird high points when no samples were found (symptom of too small scale factor)
+			targetPixelR = clampToByte( ((weightR > 1e-6) ? ( clampPixelR / weightR) : (0.0)) );
+			targetPixelG = clampToByte( ((weightG > 1e-6) ? ( clampPixelG / weightG) : (0.0)) );
+			targetPixelB = clampToByte( ((weightB > 1e-6) ? ( clampPixelB / weightB) : (0.0)) );
+			*targetPixel = SDL_MapRGB(surTransformed->format, targetPixelR, targetPixelG, targetPixelB);
 		}
+		// if(j%50 == 0) SDL_UpdateWindowSurface(winIntermediate);
 	}
 
-	SDL_UpdateWindowSurface(winIntermediate);
-	SDL_DestroyWindow(winIntermediate);
+	// for (int i = 0; i < transformedW; i++)
+	// {
+	// 	for (int j = 0; j < transformedH; j++)
+	// 	{
+	// 		targetPixel = (Uint32*)((Uint8*)(surTransformed->pixels) + surTransformed->pitch * j + surTransformed->format->BytesPerPixel * i);
+	// 		targetPixelR = 0;
+	// 		targetPixelG = 0;
+	// 		targetPixelB = 0;
+	// 		clampPixelR = 0;
+	// 		clampPixelG = 0;
+	// 		clampPixelB = 0;
+	// 		for (int k = -KERNEL_RADIUS; k <= KERNEL_RADIUS; k++)
+	// 		{
+	// 			n = ((int)round((double)(j)/scale) + k);
+	// 			if (n >= 0 && n < originalH)
+	// 			{
+	// 				SDL_GetRGB(*(Uint32*)((Uint8*)(surIntermediate->pixels) + surIntermediate->pitch * n + surIntermediate->format->BytesPerPixel * i), surIntermediate->format, &originalPixelR, &originalPixelG, &originalPixelB);
+	// 				weight = (*kernel)(n - (double)j/scale);
+	// 				clampPixelR += (double)originalPixelR * weight;
+	// 				clampPixelG += (double)originalPixelG * weight;
+	// 				clampPixelB += (double)originalPixelB * weight;
+					
+	// 				// printf("something: %lf, %d, %d\n", round((double)(j)/scale), n, clampPixelR);
+	// 			}
+	// 		}
+	// 		targetPixelR = clampToByte(clampPixelR);
+	// 		targetPixelG = clampToByte(clampPixelG);
+	// 		targetPixelB = clampToByte(clampPixelB);
+	// 		*targetPixel = SDL_MapRGB(surIntermediate->format, targetPixelR, targetPixelG, targetPixelB);
+	// 	}
+	// }
+
+	// SDL_UpdateWindowSurface(winIntermediate);
+	// SDL_DestroyWindow(winIntermediate);
+	free(intermediate);
+	free(weights);
 	return 0;
 }
 
@@ -290,7 +330,7 @@ int main(int argc, char *argv[])
 		printf("Incorrect CFA code: %c\n", argv[2][0]);
 		return 1;
 	}
-	userScale = atof(argv[3]); // should be 2 for Bayer and ~3 for XTrans
+	userScale = atof(argv[3]);
 	strncpy(originalFilename, argv[4], 70);
 	strncpy(transformedFilename, argv[5], 100);
 
