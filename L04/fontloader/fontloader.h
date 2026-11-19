@@ -3,12 +3,15 @@
 
 #include <SDL2/SDL.h>
 
+#define MFFL 128 // Max Full Filename Length
+#define DEFAULT_CHAR '?'
+
 typedef struct Font_s
 {
 	char *charList;
 	unsigned int charListLen;
 	unsigned int charSize;
-	Uint32 *charMap;
+	Uint32 **charMap;
 } Font;
 
 
@@ -19,5 +22,6 @@ int loadFont(Font *font, char *fontDir); // add scaling later
 //		bounding cell size in pixels (square)
 //		cells per row
 
+void unloadFont(Font *font); // cleanup with free() etc.
 
 #endif /* FONTLOADER_H */
