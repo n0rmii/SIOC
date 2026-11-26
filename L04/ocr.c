@@ -111,7 +111,7 @@ double *loadGrayImage(char *filename, int *w, int *h)
 		for (int i = 0; i < *w; i++)
 		{
 			SDL_GetRGB(*(Uint32*)((Uint8*)(surConverted->pixels) + surConverted->pitch * j + surConverted->format->BytesPerPixel * i), surConverted->format, &r, &g, &b);
-			*getDArrPointer(array, *w, i, j) = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0;
+			*getDArrPointer(array, *w, i, j) = (r + g + b) / 3; // (0.299 * r + 0.587 * g + 0.114 * b) / 255.0;
 		}
 	}
 	SDL_FreeSurface(surConverted);
