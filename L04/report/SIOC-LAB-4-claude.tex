@@ -1,0 +1,424 @@
+\documentclass[12pt]{article}
+\usepackage{graphicx}
+\usepackage[polish]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{multirow}
+\usepackage{multicol}
+\usepackage{array}
+\usepackage[table]{xcolor}
+\usepackage{colortbl}
+\usepackage{hyperref} % Powoduje smieszne podswietlenie na linkach
+\usepackage{subcaption}
+\usepackage{pdfpages}
+\usepackage[left=0.5in,right=0.5in,top=1in,bottom=1in]{geometry}
+\usepackage{makecell}
+\usepackage{amsmath}
+\usepackage{icomma} % Sprawia, że liczby po przecinku poprawnie wyglądają (mniejszy odstęp między przecinkiem a cyfrą po nim)
+\usepackage{gensymb}
+\usepackage{attachfile}
+
+\title{Sygnały i Obrazy Cyfrowe \\
+        \large Ćwiczenie nr 3. Zastosowania splotu: rozpoznawanie tekstu}
+\author{Michał Zywer, nr albumu 290061}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+
+% \clearpage
+\section{Wstęp}
+
+Do napisania tego sprawozdania oraz programu użyto narzędzi AI.
+
+Kod źródłowy programu użytego do rozpoznawania tekstu można znaleźć na mojej stronie Github: \url{https://github.com/n0rmii/SIOC/tree/main/L04}. Jest on napisany w języku C, a do wczytywania obrazów używa bibliotek SDL2 i SDL2\_image. W odróżnieniu od programów z poprzednich ćwiczeń działa wyłącznie w terminalu. Jako argumenty przyjmuje obraz z tekstem, metodę (\texttt{korelacja}, \texttt{splot}, \texttt{cechy} lub \texttt{siatka}), średnią liczbę fotonów $\lambda$, obraz z alfabetem, nazwę pliku wynikowego oraz opcjonalnie próg detekcji i plik z tekstem wzorcowym:
+\begin{verbatim}
+./ocr tekst.png korelacja 4 alfabet.png wynik.txt 0.6 wzorzec.txt
+\end{verbatim}
+Rozpoznany tekst jest zapisywany do pliku w kodowaniu UTF-8. Jeśli podano tekst wzorcowy, program wypisuje też liczbę niewłaściwie rozpoznanych znaków.
+
+Obraz testowy (rys. \ref{fig:tekst}) odwzorowuje rys. 1 z instrukcji. Zawiera fragment ,,Beniowskiego'' J. Słowackiego (tekst z przypisu 6 instrukcji), wypisany jasnoszarym kolorem (204) na ciemnym tle (12), tak jak w terminalu tekstowym. Użyto czcionki o stałej szerokości DejaVu Sans Mono o wielkości 15~px. Każdy znak zajmuje komórkę $9\times19$ pikseli, a cały obraz ma $786\times278$ pikseli. Tekst wzorcowy liczy 411 znaków (licząc spacje i znaki końca linii).
+
+\begin{figure}[H]
+    \centering
+    \textattachfile[color=0 0 0]{images/tekst.png}{
+        \includegraphics[width=0.9\linewidth]{images/tekst.png}
+    }
+    \caption{Obraz testowy z tekstem.}
+    \label{fig:tekst}
+\end{figure}
+
+\section{Rozgrzewka} % ===========================================================
+
+\subsection{Szum śrutowy i rozkład Poissona}
+
+Cyfry numeru albumu 290061 tworzą zbiór $\{k_i\}_{i=1}^{6} = \{2, 9, 0, 0, 6, 1\}$. Prawdopodobieństwa liczono ze wzoru
+\[
+    P(X=k\,|\,\lambda) = \frac{\lambda^k e^{-\lambda}}{k!}.
+\]
+
+\textbf{1. ,,L'embarras des richesses''} -- zarejestrowanie $X = k_i$ fotonów przy $\lambda = 1$: $P = e^{-1}/k_i!$.
+
+\textbf{2. ,,Le malheur''} -- zarejestrowanie $X = 0$ fotonów przy $\lambda = k_i$: $P = e^{-k_i}$.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|c|c|}
+        \hline
+        $k_i$ & \textbf{1.} $P(X=k_i\,|\,\lambda=1)$ & \textbf{2.} $P(X=0\,|\,\lambda=k_i)$ \\
+        \hline
+        0 & 0,3679 & 1 \\
+        1 & 0,3679 & 0,3679 \\
+        2 & 0,1839 & 0,1353 \\
+        6 & $5{,}11\cdot10^{-4}$ & $2{,}48\cdot10^{-3}$ \\
+        9 & $1{,}01\cdot10^{-6}$ & $1{,}23\cdot10^{-4}$ \\
+        \hline
+    \end{tabular}
+    \caption{Prawdopodobieństwa z punktów 1 i 2 rozgrzewki (cyfra 0 występuje w numerze albumu dwukrotnie)}
+    \label{tab:poisson}
+\end{table}
+
+Przy $\lambda = 1$ zarejestrowanie zera lub jednego fotonu jest równie prawdopodobne ($e^{-1}\approx 0{,}37$), a dziewięciu fotonów -- praktycznie niemożliwe. Z kolei przy $\lambda = 0$ (cyfry 0) zero fotonów rejestrujemy na pewno, a przy $\lambda = 9$ szansa, że piksel pozostanie pusty, to ok. $1{,}2\cdot10^{-4}$.
+
+\textbf{3. ,,Image stacking''.} $\sum_{i=1}^6 k_i = 18$. Suma niezależnych zmiennych o rozkładzie Poissona ma rozkład Poissona o średniej równej sumie średnich, więc przy $\Lambda = 18$:
+\[
+    P(X \geq 18\,|\,\Lambda = 18) = 1 - \sum_{k=0}^{17} \frac{18^k e^{-18}}{k!} \approx 0{,}5314.
+\]
+Wynik jest nieco większy niż $0{,}5$, bo do zdarzenia należy też wartość $X = 18$, równa średniej, o prawdopodobieństwie ok. $0{,}0936$.
+
+\textbf{4. Efektywność kwantowa $QE = \pi/4$.} Rejestrowanie każdego fotonu z prawdopodobieństwem $p = QE$ daje rozkład Poissona o średniej $p\cdot\Lambda = 18\pi/4 \approx 14{,}14$:
+\[
+    P(X \leq 18\,|\,\lambda = 14{,}14) = \sum_{k=0}^{18} \frac{14{,}14^k e^{-14{,}14}}{k!} \approx 0{,}8749.
+\]
+Matryca o niepełnej efektywności kwantowej rejestruje średnio mniej fotonów, więc wynik nieprzekraczający 18 staje się znacznie bardziej prawdopodobny.
+
+\subsection{Splot i korelacja wzajemna}
+
+Wzory na splot (2) i korelację wzajemną (3) z instrukcji różnią się czterema szczegółami:
+\begin{itemize}
+    \item symbolem operatora: dwie gwiazdki $\ast\ast$ splotu zastąpiono dwiema gwiazdkami $\star\star$ korelacji (dwa szczegóły),
+    \item znakiem w pierwszym indeksie: $x_{n-k}$ zamiast $x_{n+k}$,
+    \item znakiem w drugim indeksie: $x_{m-l}$ zamiast $x_{m+l}$.
+\end{itemize}
+Zmiana obu znaków oznacza, że splot z filtrem $\lambda_{kl}$ jest korelacją z filtrem obróconym o $180\degree$, czyli $\lambda_{-k,-l}$. Jeśli wiersze i kolumny filtra są palindromami (jak w kwadracie TENET), obrót niczego nie zmienia i oba wzory dają ten sam wynik.
+
+W rozpoznawaniu tekstu filtrem jest obraz litery (wzorzec), który na ogół nie jest ani symetryczny, ani separowalny. Macierz pikseli litery nie daje się zapisać jako iloczyn $\lambda_n\cdot\lambda_m$, więc w programie zastosowano pełny splot dwuwymiarowy, a nie dwa przebiegi jednowymiarowe jak przy skalowaniu i demozaikowaniu.
+
+\section{Detekcja i lokalizacja liter} % ===========================================================
+
+\subsection{Algorytm}
+
+\textbf{Wzorce liter.} Program potrzebuje obrazu każdego znaku w tej samej czcionce, w jakiej napisany jest tekst. Wzorce wycinane są z obrazu alfabetu (rys. \ref{fig:alfabet}), czyli jednej linii zawierającej 116 znaków: znaki ASCII od \texttt{!} do \texttt{\~{}}, polskie litery oraz znaki ,,~'' --- \ldots. Obraz dzielony jest na równe komórki o szerokości równej szerokości obrazu podzielonej przez liczbę znaków. Spacja nie ma wzorca. Jest wykrywana jako przerwa między literami.
+
+\begin{figure}[H]
+    \centering
+    \textattachfile[color=0 0 0]{images/alfabet.png}{
+        \includegraphics[width=1\linewidth]{images/alfabet.png}
+    }
+    \caption{Obraz alfabetu, z którego wycinane są wzorce liter ($1044\times19$ pikseli).}
+    \label{fig:alfabet}
+\end{figure}
+
+\textbf{Znormalizowana korelacja.} Surowa suma iloczynów $\sum t\cdot f$ jest tym większa, im jaśniejszy jest fragment obrazu, więc wygrywałyby litery ,,gęste'' (np. M, W) niezależnie od kształtu. Dlatego użyto znormalizowanej korelacji wzajemnej (współczynnika korelacji Pearsona wzorca z oknem obrazu):
+\[
+    \rho(x,y) = \frac{\displaystyle\sum_{k,l} t'(k,l)\, f(x+k,\,y+l)}
+                     {\sqrt{\displaystyle\sum_{k,l} t'(k,l)^2 \cdot \sum_{k,l}\left(f(x+k,\,y+l) - \bar{f}\right)^2}},
+\]
+gdzie $t' = t - \bar{t}$ to wzorzec o zerowej średniej, a $\bar{f}$ to średnia jasność okna. Dla splotu $f(x+k,\,y+l)$ zastąpiono przez $f(x-k,\,y-l)$, a reszta obliczeń jest identyczna. $\rho\in[-1,1]$, a $\rho = 1$ oznacza dokładne dopasowanie (z dokładnością do jasności i kontrastu). Sumy $\sum f$ i $\sum f^2$ w każdym oknie liczone są w czasie stałym za pomocą obrazów całkowych (ang. \emph{summed-area table}).
+
+\textbf{Od korelacji do tekstu.} Dla każdego piksela zapamiętywany jest najlepiej pasujący znak i jego wynik $\rho$. Literami są lokalne maksima tej mapy przekraczające próg, przy czym w otoczeniu o rozmiarze jednej komórki może być tylko jedno maksimum. Znalezione litery grupowane są w wiersze według współrzędnej $y$ i sortowane według $x$. Odstępy między nimi zamieniane są na spacje i puste linie na podstawie rozmiaru komórki.
+
+\textbf{Miara jakości.} Zgodnie z punktem 1 zadania miarą jest liczba niewłaściwie rozpoznanych znaków. Liczona jest jako odległość edycyjna Levenshteina między tekstem rozpoznanym a wzorcowym, czyli najmniejsza liczba zamian, usunięć i wstawień znaków. Uwzględnia ona zarówno pomylone litery, jak i litery brakujące oraz nadmiarowe, dlatego może przekroczyć liczbę znaków tekstu (411). Pomijane są tylko spacje na końcach linii.
+
+\textbf{Obraz zaszumiony.} Szum śrutowy symulowano zgodnie z przypisem 7 instrukcji: $f \to \mathrm{Poisson}(f\cdot\lambda)/\lambda$. Jasność przeskalowano tak, by najjaśniejsze piksele (litery) miały wartość 1, więc $\lambda$ jest średnią liczbą fotonów przypadających na jasne fragmenty obrazu.
+
+\subsection{Splot a korelacja wzajemna}
+
+Różnicę między obiema metodami najlepiej widać na przykładzie jednej litery. Na rys. \ref{fig:wzorzec_n} pokazano wzorzec litery \texttt{n} oraz ten sam wzorzec obrócony o $180\degree$. Rys. \ref{fig:detekcja_n} przedstawia litery wykryte przez korelację i splot z tym wzorcem przy progu $\rho \geq 0{,}9$.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.3\linewidth]{images/wzorzec_n.png}
+    \caption{Wzorzec litery \texttt{n} (po lewej) i wzorzec obrócony o $180\degree$, z którym w rzeczywistości porównuje obraz splot (po prawej).}
+    \label{fig:wzorzec_n}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \textattachfile[color=0 0 0]{images/detekcja_n.png}{
+        \includegraphics[width=0.9\linewidth]{images/detekcja_n.png}
+    }
+    \caption{Litery wykryte wzorcem \texttt{n} przy progu $0{,}9$: zielone ramki -- korelacja, czerwone -- splot.}
+    \label{fig:detekcja_n}
+\end{figure}
+
+Korelacja wykryła wszystkie 15 liter \texttt{n} oraz 5 liter \texttt{h}, których dolna część ma dokładnie kształt litery \texttt{n} ($\rho \approx 0{,}91$). Splot nie wykrył żadnej litery \texttt{n}. Zamiast nich znalazł wszystkie 6 liter \texttt{u}, bo \texttt{n} obrócone o $180\degree$ jest właśnie literą \texttt{u}. Podobnie wzorzec \texttt{a} wykrywany splotem znajduje litery \texttt{e}. Poprawnie oba operatory działają tylko dla znaków symetrycznych względem obrotu, np. \texttt{o}, \texttt{s}, \texttt{z}, \texttt{x}, \texttt{N}, \texttt{H}.
+
+Druga różnica dotyczy lokalizacji. Mapa korelacji (rys. \ref{fig:mapy}a) ma maksima w lewym górnym rogu komórki znaku, bo korelacja sięga do pikseli $f(x+k,\,y+l)$. Splot sięga do pikseli $f(x-k,\,y-l)$, więc jego maksima leżą w prawym dolnym rogu znaku. Cała mapa splotu (rys. \ref{fig:mapy}b) jest przesunięta o rozmiar wzorca ($9\times19$ pikseli) w prawo i w dół. Przesunięcie to trzeba uwzględnić przy wyznaczaniu położenia litery, co program robi.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{images/mapa_korelacja_n.png}
+        \caption{Korelacja}
+    \end{subfigure}
+    \begin{subfigure}{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{images/mapa_splot_n.png}
+        \caption{Splot}
+    \end{subfigure}
+    \caption{Mapy znormalizowanej korelacji i splotu z wzorcem \texttt{n} (czarny $= -1$, biały $= 1$)}
+    \label{fig:mapy}
+\end{figure}
+
+Wyniki rozpoznawania całego tekstu bez szumu zestawiono w tabeli \ref{tab:bez_szumu}.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|l|c|c|}
+        \hline
+        \textbf{Metoda} & \textbf{Błędne znaki} & \textbf{Odsetek} \\
+        \hline
+        Korelacja wzajemna & 1   & 0,2\%  \\
+        Splot              & 365 & 88,8\% \\
+        \hline
+    \end{tabular}
+    \caption{Rozpoznawanie tekstu bez szumu, próg $0{,}6$}
+    \label{tab:bez_szumu}
+\end{table}
+
+Korelacja odczytała tekst bezbłędnie z wyjątkiem linii ,,------'' (dwie pauzy obok siebie), w której rozpoznała tylko jedną pauzę. Dwie pauzy tworzą ciągłą poziomą kreskę, więc wynik korelacji jest jednakowy w każdym położeniu wzdłuż niej i maksimum nie wskazuje jednoznacznie położenia znaku. Splot zamienia tekst w ciąg obróconych znaków:
+\begin{verbatim}
+D qa uai  e!  Zpe sTa p e o u op
+ seui de'  io e  z sio pom nmTeie
+\end{verbatim}
+Poprawne są w nim prawie wyłącznie litery symetryczne (\texttt{o}, \texttt{s}, \texttt{z}) i znaki, które po obróceniu przypominają inny znak alfabetu (\texttt{n}$\to$\texttt{u}, \texttt{a}$\to$\texttt{e}, \texttt{d}$\to$\texttt{p}, \texttt{b}$\to$\texttt{q}).
+
+\subsection{Wybór metody}
+
+Do detekcji i lokalizacji liter \textbf{lepsza jest korelacja wzajemna}. Uzasadnienie:
+\begin{itemize}
+    \item Korelacja jest filtrem dopasowanym (ang. \emph{matched filter}): jej wynik jest największy dokładnie wtedy, gdy fragment obrazu ma kształt wzorca. Splot mierzy podobieństwo do wzorca obróconego o $180\degree$, więc myli litery z ich obrazami odwróconymi (tab. \ref{tab:bez_szumu}, rys. \ref{fig:detekcja_n}).
+    \item Maksimum korelacji leży w ustalonym punkcie znaku (lewy górny róg okna), więc położenie litery odczytuje się bezpośrednio. Przy splocie trzeba uwzględnić przesunięcie o rozmiar wzorca.
+    \item Splot daje ten sam wynik co korelacja tylko wtedy, gdy wzorzec zostanie najpierw obrócony o $180\degree$. Jest to wtedy po prostu korelacja zapisana innym wzorem.
+\end{itemize}
+
+\subsection{Wpływ szumu}
+
+Na rys. \ref{fig:szum} pokazano obraz testowy po dodaniu szumu śrutowego dla $\lambda = 16$, 4 i 1 fotonów na jasne fragmenty.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{images/szum_16.png}
+        \caption{$\lambda = 16$}
+    \end{subfigure}
+    \begin{subfigure}{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{images/szum_4.png}
+        \caption{$\lambda = 4$}
+    \end{subfigure}
+    \begin{subfigure}{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{images/szum_1.png}
+        \caption{$\lambda = 1$}
+    \end{subfigure}
+    \caption{Obraz testowy z szumem śrutowym}
+    \label{fig:szum}
+\end{figure}
+
+Szum jest losowy, więc dla każdej kombinacji metody, $\lambda$ i progu wykonano 10 rozpoznań z różnymi realizacjami szumu. W tabeli \ref{tab:szum} podano średnią liczbę błędnych znaków oraz w nawiasie wartość najmniejszą i największą.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|l|c|c|c|c|}
+        \hline
+        \textbf{Metoda} & \textbf{Próg} & \textbf{$\lambda = 16$} & \textbf{$\lambda = 4$} & \textbf{$\lambda = 1$} \\
+        \hline
+        \multirow{4}{*}{Korelacja}
+            & 0,5 & 4,8 (0--39) & 43,3 (7--125) & 1399,8 (1253--1573) \\
+            & 0,6 & 1,1 (1--2) & \textbf{10,5 (6--21)} & 562,1 (404--828) \\
+            & 0,7 & \textbf{1,0 (1--1)} & 23,2 (14--56) & \textbf{361,4 (348--396)} \\
+            & 0,8 & 1,3 (0--3) & 210,4 (204--217) & 406,6 (368--411) \\
+        \hline
+        \multirow{4}{*}{Splot}
+            & 0,5 & 391,2 (365--413) & 445,1 (378--577) & 1504,8 (1174--1648) \\
+            & 0,6 & 384,9 (360--415) & 386,1 (343--456) & 602,6 (495--768) \\
+            & 0,7 & 375,4 (362--412) & 337,0 (310--422) & 370,9 (361--394) \\
+            & 0,8 & 370,0 (333--385) & 336,8 (332--342) & 407,5 (378--411) \\
+        \hline
+    \end{tabular}
+    \caption{Liczba błędnych znaków (na 411) przy szumie śrutowym: średnia z 10 realizacji (min--max)}
+    \label{tab:szum}
+\end{table}
+
+\textbf{$\lambda = 16$.} Korelacja działa praktycznie tak samo jak bez szumu: przy progu 0,6--0,7 błędem jest prawie zawsze tylko podwójna pauza. Szum o średnio 16 fotonach na piksel litery ma odchylenie standardowe $\sqrt{16} = 4$, czyli 25\% sygnału. Sumowanie po $9\cdot19 = 171$ pikselach wzorca uśrednia go na tyle, że poprawny znak wyraźnie wygrywa z pozostałymi.
+
+\textbf{$\lambda = 4$.} Szum ma już odchylenie 50\% sygnału. Najlepszy wynik (średnio 10,5 błędu, czyli ok. 2,6\%) daje korelacja z progiem 0,6. Przykładowy rozpoznany tekst:
+\begin{verbatim}
+Cybernetyka!… Zda się dla ochłody
+Ksantypa, która czysto dom umiata,
+Na Sokratesa leje ceber wody
+A potem mydli  ę pochodnię świata,
+Łeb inclusive z nosem. aż do brody.
+D bra Niemkini! ale nie sk zydlata
+\end{verbatim}
+Błędy to głównie pominięte litery (wynik prawdziwej litery spadł poniżej progu) oraz pomylone drobne znaki interpunkcyjne (\texttt{,}$\to$\texttt{.}, \texttt{:}$\to$\texttt{.}). Wynik jest bardzo wrażliwy na próg. Przy progu 0,5 do tekstu trafiają fałszywe ,,litery'' powstałe z szumu między prawdziwymi znakami, a przy 0,8 odrzucana jest połowa prawdziwych liter.
+
+\textbf{$\lambda = 1$.} Przy jednym fotonie na piksel litery (rys. \ref{fig:szum}c) rozpoznawanie przestaje działać. Wynik $\rho$ prawdziwej litery spada do ok. 0,5--0,6 (mediana 0,54), czyli do poziomu przypadkowych dopasowań szumu do wzorców drobnych znaków (\texttt{.}, \texttt{'}, \texttt{-}). Żaden próg ich nie rozdziela. Przy niskim progu tekst jest zalany fałszywymi znakami (ponad 1000 błędów), a przy wysokim prawie pusty (ok. 360--400 błędów, czyli brak niemal całego tekstu).
+
+Splot nawet przy najlepiej dobranym progu daje ok. 340--380 błędów, bo niezależnie od szumu odczytuje głównie litery odwrócone.
+
+\subsection{Wnioski}
+
+\textbf{Zalety} rozpoznawania tekstu korelacją ze wzorcami:
+\begin{itemize}
+    \item Dla tekstu w znanej czcionce i przy dobrej jakości obrazu ($\lambda \geq 16$) działa niemal bezbłędnie, bez żadnego uczenia ani doboru parametrów poza progiem.
+    \item Normalizacja sprawia, że wynik nie zależy od jasności i kontrastu tekstu, więc działa dla dowolnych kolorów tekstu i tła w terminalu.
+    \item Korelacja jest filtrem optymalnym dla wykrywania znanego kształtu w szumie, więc dobrze znosi umiarkowany szum ($\lambda = 4$: ok. 2,6\% błędów).
+    \item Jednocześnie wykrywa i lokalizuje litery, bez osobnej segmentacji tekstu na znaki.
+\end{itemize}
+
+\textbf{Wady:}
+\begin{itemize}
+    \item Wymaga wzorców w \emph{dokładnie tej samej} czcionce i wielkości. Każda zmiana kroju, grubości lub pochylenia pisma obniża dopasowanie (sprawdzone w p. \ref{sec:lepsze}).
+    \item Litery podobne kształtem (\texttt{n} i \texttt{h}, \texttt{l} i \texttt{1}, \texttt{,} i \texttt{.}) różnią się tylko kilkoma pikselami, więc przy szumie są mylone.
+    \item Wynik jest wrażliwy na wybór progu, a optymalny próg zależy od poziomu szumu (0,6--0,7 dla $\lambda=16$, 0,6 dla $\lambda=4$).
+    \item Fałszywe maksima pojawiają się między prawdziwymi literami, gdy okno obejmuje fragmenty dwóch sąsiednich znaków.
+    \item Koszt obliczeniowy jest duży: dla każdego z 116 wzorców i każdego piksela obrazu trzeba policzyć sumę 171 iloczynów (ok. $4\cdot10^9$ operacji, ok. 1,4~s dla obrazu testowego).
+\end{itemize}
+
+\subsection{Lepsze rozwiązanie} \label{sec:lepsze}
+
+Zgodnie z przypisem 8 instrukcji sprawdzono dwa ulepszenia, każde skierowane na inną słabość metody.
+
+\subsubsection{Korelacja cech kreskowych}
+
+Pomysł wzorowany jest na neokognitronie Fukushimy. Zamiast porównywać piksele, porównuje się \emph{kreski}, z których zbudowana jest litera. Obraz i alfabet są najpierw splatane z czterema detektorami linii $3\times3$ (poziomej, pionowej i dwóch ukośnych), np. dla linii poziomej:
+\[
+    \begin{bmatrix} -1 & -1 & -1 \\ 2 & 2 & 2 \\ -1 & -1 & -1 \end{bmatrix}.
+\]
+Ujemne odpowiedzi są obcinane do zera, a mapy rozmywane filtrem uśredniającym $3\times3$. Rozmycie ma sprawić, że kreska przesunięta o piksel albo nieco grubsza nadal pokrywa się z kreską wzorca. Dopiero na tych czterech mapach cech (rys. \ref{fig:cechy}) liczona jest znormalizowana korelacja, sumowana po wszystkich mapach (metoda \texttt{cechy}).
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{images/cechy.png}
+    \caption{Fragment obrazu i jego cechy kreskowe: linie poziome, pionowe, ukośne $\backslash$ i ukośne /.}
+    \label{fig:cechy}
+\end{figure}
+
+Do sprawdzenia odporności na zmianę kroju pisma przygotowano ten sam tekst w czterech innych czcionkach o tej samej wielkości komórki (rys. \ref{fig:czcionki}). Wzorce nadal pochodziły z alfabetu w czcionce DejaVu Sans Mono.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{images/tekst_dejavu_bold.png}
+        \caption{DejaVu Sans Mono Bold}
+    \end{subfigure}
+    \begin{subfigure}{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{images/tekst_dejavu_oblique.png}
+        \caption{DejaVu Sans Mono Oblique}
+    \end{subfigure}
+    \begin{subfigure}{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{images/tekst_liberation.png}
+        \caption{Liberation Mono}
+    \end{subfigure}
+    \begin{subfigure}{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{images/tekst_freemono.png}
+        \caption{FreeMono}
+    \end{subfigure}
+    \caption{Tekst testowy w innych czcionkach}
+    \label{fig:czcionki}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|l|c|c|c|c|c|}
+        \hline
+        \textbf{Metoda} & \textbf{DejaVu} & \textbf{Bold} & \textbf{Oblique} & \textbf{Liberation} & \textbf{FreeMono} \\
+        \hline
+        Korelacja pikseli                     & 1 & 50 & 71 & 77 & 424 \\
+        Korelacja cech, rozmycie $1\times1$   & 0 & 76 & 149 & 90 & 552 \\
+        Korelacja cech, rozmycie $3\times3$   & \textbf{0} & 71 & \textbf{46} & 93 & 325 \\
+        Korelacja cech, rozmycie $5\times5$   & 26 & 103 & 129 & 121 & 309 \\
+        Korelacja pikseli na siatce           & \textbf{0} & \textbf{35} & 60 & \textbf{71} & \textbf{152} \\
+        \hline
+    \end{tabular}
+    \caption{Liczba błędnych znaków (na 411) dla tekstu w różnych czcionkach, bez szumu, wzorce z czcionki DejaVu Sans Mono}
+    \label{tab:czcionki}
+\end{table}
+
+Wyniki (tab. \ref{tab:czcionki}) są niejednoznaczne. Cechy kreskowe z rozmyciem $3\times3$ wyraźnie poprawiły rozpoznawanie pisma pochylonego (46 zamiast 71 błędów) i czcionki FreeMono (325 zamiast 424). Usunęły też jedyny błąd w tekście oryginalnym (podwójną pauzę). Dla czcionki pogrubionej i Liberation Mono dały jednak wynik gorszy niż zwykła korelacja. W tych krojach kreski leżą w podobnych miejscach co w DejaVu, a różnice tkwią w szczegółach. Np. litera \texttt{e} w czcionce Liberation Mono jest przez obie metody mylona z \texttt{a}. Zbyt małe rozmycie nie daje żadnej tolerancji na zmianę kształtu, a zbyt duże zaciera różnice między literami. W większości przypadków najlepsze okazało się rozmycie $3\times3$.
+
+Cechy kreskowe okazały się natomiast \emph{gorsze} przy szumie (tab. \ref{tab:szum_lepsze}). Detektory linii są filtrami górnoprzepustowymi, więc wzmacniają szum śrutowy, który nie ma żadnej korelacji między sąsiednimi pikselami.
+
+\subsubsection{Korelacja na siatce znaków}
+
+Druga propozycja wykorzystuje fakt, że w terminalu tekstowym (i w każdej czcionce o stałej szerokości) znaki leżą na regularnej siatce komórek. Zamiast szukać maksimów korelacji w dowolnym miejscu, program (metoda \texttt{siatka}):
+\begin{enumerate}
+    \item wyznacza przesunięcie siatki $(o_x, o_y)$, $0 \leq o_x < 9$, $0 \leq o_y < 19$, dla którego suma najlepszych wyników $\rho$ we wszystkich węzłach siatki jest największa,
+    \item w każdym węźle siatki wybiera najlepiej pasujący znak, jeśli jego wynik przekracza próg, a w przeciwnym razie wstawia spację.
+\end{enumerate}
+Przesunięcie siatki wyznaczane jest z całego obrazu, czyli z kilkuset liter jednocześnie, więc szum praktycznie na nie nie wpływa. Fałszywe maksima między literami, główne źródło błędów przy szumie, nie mogą się pojawić, bo badane są tylko położenia w węzłach siatki.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|l|c|c|c|c|}
+        \hline
+        \textbf{Metoda} & \textbf{Próg} & \textbf{$\lambda = 16$} & \textbf{$\lambda = 4$} & \textbf{$\lambda = 1$} \\
+        \hline
+        \multirow{2}{*}{Korelacja pikseli}
+            & 0,6 & 1,1 (1--2) & 10,5 (6--21) & 562,1 (404--828) \\
+            & 0,7 & 1,0 (1--1) & 23,2 (14--56) & 361,4 (348--396) \\
+        \hline
+        \multirow{2}{*}{Korelacja cech}
+            & 0,7 & 4,0 (0--28) & 86,7 (50--161) & 707,2 (544--880) \\
+            & 0,8 & 1,5 (0--4) & 159,8 (150--172) & 377,1 (359--401) \\
+        \hline
+        \multirow{4}{*}{Korelacja na siatce}
+            & 0,4 & 0,3 (0--3) & 19,5 (1--70) & 228,9 (153--310) \\
+            & 0,5 & \textbf{0,0 (0--0)} & \textbf{2,5 (0--4)} & \textbf{170,8 (120--293)} \\
+            & 0,6 & 0,0 (0--0) & 4,3 (1--8) & 280,5 (274--289) \\
+            & 0,7 & 0,0 (0--0) & 17,5 (12--22) & 369,8 (352--396) \\
+        \hline
+    \end{tabular}
+    \caption{Porównanie ulepszeń przy szumie śrutowym: średnia liczba błędnych znaków z 10 realizacji (min--max)}
+    \label{tab:szum_lepsze}
+\end{table}
+
+Korelacja na siatce jest najlepsza przy każdym poziomie szumu (tab. \ref{tab:szum_lepsze}). Dla $\lambda=16$ odczytuje tekst bezbłędnie we wszystkich 10 próbach, a dla $\lambda=4$ zmniejsza liczbę błędów ok. 4 razy (2,5 zamiast 10,5). W części prób przy $\lambda=4$ tekst jest odczytany całkowicie poprawnie. Dla $\lambda=1$ błędów jest nadal dużo (ok. 42\%), ale tekst przestaje być zupełnie nieczytelny:
+\begin{verbatim}
+C  er e vk *  Zda  ię d a oc  o
+ s ntypa,  tó   czysto oo  umiata
+N   o  otesa l        r wody
+A potem    li  e pn bodnię    a a
+\end{verbatim}
+Zwykła korelacja przy tym samym poziomie szumu i najlepszym progu (0,7) zostawia z całego tekstu tylko kilkanaście rozrzuconych znaków. Metoda ta poprawia też wyniki dla innych czcionek (tab. \ref{tab:czcionki}): błędów jest od 8\% (Liberation Mono) do 64\% (FreeMono) mniej niż przy korelacji pikseli, bo również tam część błędów wynikała z fałszywych lub pominiętych maksimów, a nie z pomylonych liter. Koszt obliczeń jest praktycznie taki sam jak dla zwykłej korelacji (1,4~s wobec 3,8~s dla cech kreskowych).
+
+\subsubsection{Podsumowanie}
+
+Do rozpoznawania tekstu z terminala najlepsze okazało się połączenie \textbf{znormalizowanej korelacji wzajemnej z siatką znaków}. Jest odporne na szum aż do $\lambda \approx 4$ i nie wymaga dodatkowych obliczeń. Wymaga jednak czcionki o stałej szerokości, więc nie nadaje się do pisma proporcjonalnego ani odręcznego.
+
+Cechy kreskowe są krokiem w stronę rozpoznawania innych krojów pisma i pomagają tam, gdzie zmienia się geometria liter (pochylenie). Cztery stałe detektory linii z jednym poziomem rozmycia to jednak za mało. Do pisma odręcznego potrzebne byłyby:
+\begin{itemize}
+    \item wiele poziomów cech, jak w neokognitronie: kreski $\to$ ich połączenia i zakończenia $\to$ fragmenty liter $\to$ litery, z rozmyciem (ang. \emph{pooling}) na każdym poziomie, tak by tolerancja na zniekształcenia rosła stopniowo,
+    \item wzorce z wielu krojów pisma lub próbek pisma dla każdego znaku zamiast jednego wzorca,
+    \item filtry \emph{wyuczone} na przykładach zamiast dobranych ręcznie. Jest to idea współczesnych splotowych sieci neuronowych (CNN), które są bezpośrednimi następcami neokognitronu,
+    \item przy silnym szumie: filtracja dolnoprzepustowa obrazu przed wyznaczaniem cech, żeby detektory kresek nie wzmacniały szumu.
+\end{itemize}
+
+\end{document}
