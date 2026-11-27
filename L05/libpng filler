@@ -1,0 +1,54 @@
+// libpng code from: https://libpng.org/pub/png/libpng-1.4.0-manual.pdf
+#include <png.h>
+
+FILE *image = NULL;
+
+	image = fopen(argv[1], "rb");
+	if (image == NULL)
+	{
+		printf("Could not open file '%s'\n", argv[1]);
+		return 1;
+	}
+
+	char header[PNG_HEADER_LEN] = {};
+	fread(header, sizeof(char), PNG_HEADER_LEN, image);
+	
+	if (png_sig_cmp(header, 0, PNG_HEADER_LEN) != 0)
+	{
+		printf("File '%s' is not a PNG file\n", argv[1]);
+		fclose(image);
+		return 1;
+	}
+	// fseek(image, 0, SEEK_SET);
+
+	png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, (png_voidp)NULL, NULL, NULL);
+	if (!png_ptr)
+	{
+		printf("Failed to initialise png_ptr\n");
+		fclose(image);
+		return 1;
+	}
+
+	png_infop info_ptr = png_create_info_struct(png_ptr);
+	if (!info_ptr)
+	{
+		printf("Failed to initialise info_ptr\n");
+		fclose(image);
+		png_destroy_read_struct(&png_ptr, (png_infopp)NULL, (png_infopp)NULL);
+		return 1;
+	}
+
+	png_infop end_info = png_create_info_struct(png_ptr);
+	if (!end_info)
+	{
+		printf("Failed to initialise end_info\n");
+		fclose(image);
+		png_destroy_read_struct(&png_ptr, &info_ptr, (png_infopp)NULL);
+		return 1;
+	}
+
+	png_init_io(png_ptr, image);
+	png_set_sig_bytes(png_ptr, PNG_HEADER_LEN);
+	
+	png_destroy_read_struct(&png_ptr, &info_ptr, (png_infopp)NULL);
+	fclose(image);
